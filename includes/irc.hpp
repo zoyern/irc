@@ -12,20 +12,24 @@
 
 #pragma once
 
+#include <sys/socket.h>
+#include <sys/epoll.h>
+#include <sys/resource.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <csignal>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <algorithm>
-#include <sstream>
-#include <exception>
 #include <cstring>
 #include <cstdlib>
-#include <cerrno>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <map>
+#include <iostream>
 
-#include "irc/Server.hpp"
-#include "irc/Client.hpp"
-#include "irc/Channel.hpp"
+
+
+#include <irc/Server.hpp>
+#include <irc/Client.hpp>
+#include <irc/Channel.hpp>
+#include <irc/Console.hpp>
