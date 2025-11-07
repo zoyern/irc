@@ -12,6 +12,7 @@
 
 #include <irc.hpp>
 
+Server::~Server() {}
 Server::Server(const std::string &port, const std::string &password, bool console = false, std::string path = "irc.log") 
     : fd(init_socket())
 	,_epfd(_init_epoll()),
@@ -32,20 +33,31 @@ Server::Server(const std::string &port, const std::string &password, bool consol
 	console.log(":[max clients : "  + _max_clients + " ]", "Server::Server");
 }
 
-void Server::_update_reserved_fds(int delta) { _used_reserved_fds += delta;	_max_clients = _calculate_max_clients(MAX_CLIENTS, _reserved_fds); }
+Server::Server(const Server& other) { *this = other; }
 
-uint16_t Server::check_port(const std::string &port) {
-	std::istringstream iss(port);
-	int port_num;
-	if (!(iss >> port_num) || port_num > 65535 || port_num < 1)
-		throw (std::invalid_argument("Invalid port"));
-	return(static_cast<uint16_t>(port_num));
+Server&	Server::operator=(const Server& other) {
+	if (this != &other) {
+		_fd = other._fd;
+		_epfd = other._epfd;
+		_running = other._running;
+		_port = other._port;
+		_password = other._password;
+		_name = other._name;
+		_address = other._address;
+		_connexion_msg = other._connexion_msg;
+		_max_clients = other._max_clients;
+		_reserved_fds = other._reserved_fds;
+		_timeout = other._timeout;
+		_queue = other._queue;
+		_console = other._console;
+		_default_channel = other._default_channel;
+		_channels = other._channels;
+		_clients = other._clients;
+	}
+	return (*this);
 }
 
-Channel &Server::channel(const std::string &name, bool is_default) {
-	std::pair<std::map<std::string, Channel>::iterator, bool> channel =
-    _channels.insert(std::pair<std::string, Channel>(name, Channel(name)));
-	if (is_default) { debug(INFO, CHANNEL_SET_DEFAULT + name); _default_channel = channel.first->second; }
-	channel.second ? debug(INFO, CHANNEL_CREATED + name) : debug(INFO, CHANNEL_EXISTS + name);
-	return (channel.first->second);
-}
+
+int		&Server::run() {}
+void	&Server::stop() {}
+

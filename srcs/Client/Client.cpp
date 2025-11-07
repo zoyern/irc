@@ -11,14 +11,6 @@
 /* ************************************************************************** */
 
 #include <irc.hpp>
-/*
-void event()
-{
-	uint16_t epoll_fd = epoll_create1(0);
-	if (epoll_fd < 0)
-		return ;
-	struct epoll_event ev;
-	ev.events = EPOLLIN;
-	ev.data.fd = 7;
-	epoll_ctl(epoll_fd, EPOLL_CTL_ADD, &ev.data.fd, &ev);
-}*/
+
+Client::~Client() {}
+Client::Client() {}

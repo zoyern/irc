@@ -30,20 +30,6 @@ enum Protocol {
 	#define QUEUE 			128
 #endif
 
-#ifndef CHANNEL
-	#define CHANNEL_NAME		"general"
-	#define CHANNEL_OPERATOR	-1
-	#define CHANNEL_SIZE		-1
-	#define CHANNEL_DEFAULT		true
-	#define CHANNEL_INV_ONLY	false
-	#define CHANNEL_REST_TOPIC	true
-	#define CHANNEL_TOPIC		"Welcome to the general channel!"			
-	#define CHANNEL_CREATED		"Created channel: "
-	#define CHANNEL_EXISTS		"Existing channel used:"			
-	#define CHANNEL_SET_DEFAULT	"Set to default channel :"			
-#endif
-
-
 
 enum e_event {
 	ON_START   = 1 << 0,  // 0001 = 1
@@ -71,8 +57,7 @@ class Server {
 		int 		_timeout;
 		int 		_queue;
 
-		Console		*console;
-		
+		Console							*_console;
 		Channel							*_default_channel;
 		std::map<std::string, Channel*>	_channels;
 		std::map<int, Client*>			_clients;
@@ -100,11 +85,11 @@ class Server {
 		void	stop();
 	private:
 		uint16_t 	check_port(const std::string &port);
+		void		_update_reserved_fds(int delta);
 
 		void _init_socket();
 		void _init_epoll();
 		void _init_limits();
 		void _init_console();
 
-		void _update_reserved_fds(int delta);
 };

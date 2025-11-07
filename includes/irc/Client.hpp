@@ -13,8 +13,8 @@
 #pragma once
 #include "../irc.hpp"
 
-class IrcClient {
+class Client {
 public:
-	IrcClient();
-	~IrcClient();
+	Client();
+	~Client();
 };
