@@ -20,8 +20,19 @@ uint16_t Server::check_port(const std::string &port) {
 	return(static_cast<uint16_t>(port_num));
 }
 
-void Server::_update_reserved_fds(int delta) { _used_reserved_fds += delta;	_max_clients = _calculate_max_clients(MAX_CLIENTS, _reserved_fds); }
+void Server::_update_reserved_fds(int delta) { (void)delta; }
 
-void Server::_init_socket() {}
-void Server::_init_epoll() {}
-void Server::_init_limits() {}
+int Server::_init_socket() {
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	fd < 0 ? throw(std::runtime_error("socket() failed")) : fd;
+
+	return (fd);
+}
+Epoll &Server::_init_epoll() {
+	try  {_epoll = Epoll(); }
+	catch (std::exception &e) { clean(); throw std::runtime_error(e.what()); }
+	return (_epoll);
+}
+
+int Server::_init_limit(int max) { (void)max; return (0); }
+int Server::_init_reserved(int reserved) { (void)reserved; return (0); }

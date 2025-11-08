@@ -27,11 +27,24 @@ CFLAGS      = -Wall -Wextra -Werror -g3 -std=c++98 -I$(INC_DIR)
 DEPFLAGS    = -MMD -MP
 AR          = ar rcs
 
-SRCS        =	Server/Server.cpp \
-            	Client/Client.cpp \
-            	Channel/Channel.cpp \
-            	Console/Console.cpp \
-            	signals.cpp
+SRCS		= signals.cpp
+
+SRCS        +=	Server/Server.cpp \
+				Server/Server_public.cpp \
+				Server/Server_private.cpp \
+				Server/Epoll/Epoll.cpp
+
+SRCS        +=	Client/Client.cpp \
+				Client/Client_public.cpp \
+				Client/Client_private.cpp
+
+SRCS        +=	Channel/Channel.cpp \
+				Channel/Channel_public.cpp \
+				Channel/Channel_private.cpp
+
+SRCS        +=	Console/Console.cpp \
+				Console/Console_public.cpp \
+				Console/Console_private.cpp
 
 MAIN_SRCS   = main.cpp
 

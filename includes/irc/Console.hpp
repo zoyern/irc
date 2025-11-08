@@ -13,8 +13,6 @@
 #pragma once
 #include <irc.hpp>
 
-//bitflags pour combiner les niveaux de log
-
 enum e_loglevel {
     NONE    = 0,
     LOG   	= 1 << 0,
@@ -29,32 +27,49 @@ enum e_loglevel {
 
 #ifndef CONSOLE_SETTINGS
     #define ENABLED_LEVEL		(DEBUG | INFO | WARNING | ERROR)
+	#define OUTPUT_TO_STDOUT	true
     #define OUTPUT_TO_FILE		false
-    #define OUTPUT_TO_STDOUT	true
 	#define LOG_LEVEL			5
-
 	#define ERROR_LOG_OPEN		"[Console] Failed to open log file: "
 	#define ERROR_LOGS_OPEN		"[Console] Failed to create any log files!"
 #endif
 
 class Console {
 	public:
-		typedef static struct {std::string key; e_loglevel value;} log_level[LOG_LEVEL];
+		struct LogLevel { std::string key; e_loglevel value; };
+		static LogLevel	log_level[LOG_LEVEL];
+		class Stream {
+			private:
+				Console            &_console;
+				int                 _level;
+				std::string         _prefix;
+				std::ostringstream  _buffer;
+			
+			public:
+				~Stream();
+				Stream(Console& console, int level = LOG, const std::string& prefix = "");
+
+				void reset(int level, const std::string& prefix);
+				template<typename T>
+				Stream& operator<<(const T& value);
+
+		};
 	private:
 		bool			_active;
 		bool 			_out_stdout;
 		bool			_out_file;
 		int				_enabled_levels;
 		std::string		_path_log;
+		Stream			_stream;
 		std::ofstream   _files[LOG_LEVEL];
 
 		Console();
 
-		void		_create_directories(const std::string& path);
-		int			_level_to_index(e_loglevel lvl) const;
-		std::string	_get_timestamp_filename() const;
-		std::string	_timestamp() const;
-		std::string	_format(int levels, const std::string& msg, const std::string& prefix) const;
+	void		_create_directories(const std::string& path);
+	void		_log_internal(int levels, const std::string& msg, const std::string& prefix);
+    std::string	_get_timestamp_filename() const;
+    std::string	_timestamp() const;
+    std::string	_format(int levels, const std::string& msg, const std::string& prefix) const;
 	public:
 		~Console();
 
@@ -71,13 +86,11 @@ class Console {
 		void	start();
 		void	stop();
 
-		void	log(int levels, const std::string& msg, const std::string& prefix = "");
-		void	log(const std::string& msg);
-
-		void	debug(const std::string& msg, const std::string& prefix = "");
-		void	info(const std::string& msg, const std::string& prefix = "");
-		void	warning(const std::string& msg, const std::string& prefix = "");
-		void	error(const std::string& msg, const std::string& prefix = "");
-
-	private:
+		Stream &log(int level = LOG, const std::string& prefix = "");
+		Stream &debug(const std::string& prefix = "");
+		Stream &info(const std::string& prefix = "");
+		Stream &warning(const std::string& prefix = "");
+		Stream &error(const std::string& prefix = "");
 };
+
+#include <irc/Console/Stream.tpp>

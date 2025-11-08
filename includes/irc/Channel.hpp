@@ -26,8 +26,25 @@
 	#define CHANNEL_SET_DEFAULT	"Set to default channel :"			
 #endif
 
-class Channel; {
+class Channel {
+	private:
+		std::string	_name;
+		std::string	_password;
+		std::string	_topic;
+		int			_operator;
+		int			_size;
+		bool		_invite_only;
+		bool		_restricted_topic;
 public:
-	Channel();
+	Channel(const std::string &name);
 	~Channel();
+
+	Channel	&password(const std::string& pass);
+	Channel	&topic(const std::string& topic);
+	Channel	&op(int op);
+	Channel	&size(int size);
+	Channel	&invite_only(bool inv_only);
+	Channel	&restricted_topic(bool rest_topic);
+
+
 };

@@ -14,9 +14,14 @@
 
 #include <irc.hpp>
 
+class Client;
+class Channel;
+class Console;
+class Epoll;
+
 enum Protocol {
-    PROTO_TCP,
-    PROTO_UDP,
+    PROTO_TCP = 1 << 0,
+    PROTO_UDP = 1 << 1,
     PROTO_BOTH = PROTO_TCP | PROTO_UDP
 };
 
@@ -32,32 +37,33 @@ enum Protocol {
 
 
 enum e_event {
-	ON_START   = 1 << 0,  // 0001 = 1
-    ON_UPDATE    = 1 << 1,  // 0010 = 2 
-    ON_SHUTDOWN = 1 << 2,  // 0100 = 4
-    ON_CONNECT   = 1 << 3   // 1000 = 8
-    ON_DISCONNECT   = 1 << 4   // 10000 = 16
+	ON_START   = 1 << 0,
+    ON_UPDATE    = 1 << 1,
+    ON_SHUTDOWN = 1 << 2,
+    ON_CONNECT   = 1 << 3,
+    ON_DISCONNECT   = 1 << 4 
 };
 
 class Server {
 	public:
 		typedef	void	(*Callback)(Server &server, void* data);
+		Console			&console;
 	private:
 		int 		_fd;
-		int 		_epfd;
 		bool 		_running;
 
+		Epoll		_epoll;
 		uint16_t	_port;
 		std::string	_password;
 		std::string	_name;
 		std::string	_address;
 		std::string	_connexion_msg;
+
 		int			_max_clients;
 		int			_reserved_fds;
 		int 		_timeout;
 		int 		_queue;
 
-		Console							*_console;
 		Channel							*_default_channel;
 		std::map<std::string, Channel*>	_channels;
 		std::map<int, Client*>			_clients;
@@ -77,19 +83,20 @@ class Server {
 		Server& reserved_fds(int reserved);
 		Server& timeout(int seconds);
 		Server& queue(int backlog);
-		Server& hook(e_event event, Callback callback, void* data = NULL);
+		Server& hook(int event, Callback callback, void* data = NULL);
 
 		Channel& channel(const std::string &name, bool is_default = false);
 
 		int		run();
 		void	stop();
+		void	clean();
 	private:
 		uint16_t 	check_port(const std::string &port);
 		void		_update_reserved_fds(int delta);
 
-		void _init_socket();
-		void _init_epoll();
-		void _init_limits();
-		void _init_console();
+		int		_init_socket();
+		Epoll	&_init_epoll();
+		int		_init_limit(int max);
+		int		_init_reserved(int reserved);
 
 };
