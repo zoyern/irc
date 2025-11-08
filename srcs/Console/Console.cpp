@@ -12,68 +12,42 @@
 
 #include <irc.hpp>
 
-struct {std::string key; e_loglevel value;} Console::log_level[LOG_LEVEL] = {
-	{"LOG", LOG},
-	{"DEBUG", DEBUG},
-	{"INFO", DEBUG},
-	{"WARNING", DEBUG},
-	{"ERROR", DEBUG},
-	{"", NONE}
+Console::LogLevel Console::log_level[LOG_LEVEL] = {
+	{"LOG",     LOG},
+	{"DEBUG",   DEBUG},
+	{"INFO",    INFO},
+	{"WARNING", WARNING},
+	{"ERROR",   ERROR}
 };
 
 Console::~Console() { for (int i = 0; i < LOG_LEVEL; i++) { if (_files[i].is_open()) _files[i].close(); }}
-
 Console::Console()
     : _active(true)
-    , _enabled_levels(ENABLED_LEVEL)
-    , _output_to_stdout(OUTPUT_TO_STDOUT)
-    , _output_to_file(OUTPUT_TO_FILE)
+    , _out_stdout(OUTPUT_TO_STDOUT)
+    , _out_file(OUTPUT_TO_FILE)
+	, _enabled_levels(ENABLED_LEVEL)
+	, _path_log("")
+	, _stream(*this)
 {}
+Console& Console::instance() { static Console instance; return (instance); }
 
-void Console::log(int levels, const std::string& msg, const std::string& prefix) {
-    if (!_active) return;
-
-    std::ostringstream output(_format(levels, msg, prefix));
-    
-    if (_output_to_file) {
-        if (_files[4].is_open()) {
-            _files[4] << output << std::endl;
-            _files[4].flush();
-        }
-        
-        // Écrire dans fichiers spécifiques
-        if (levels & DEBUG) {
-            int idx = _level_to_index(DEBUG);
-            if (idx >= 0 && _files[idx].is_open()) {
-                _files[idx] << output << std::endl;
-                _files[idx].flush();
-            }
-        }
-        if (levels & INFO) {
-            int idx = _level_to_index(INFO);
-            if (idx >= 0 && _files[idx].is_open()) {
-                _files[idx] << output << std::endl;
-                _files[idx].flush();
-            }
-        }
-        if (levels & WARNING) {
-            int idx = _level_to_index(WARNING);
-            if (idx >= 0 && _files[idx].is_open()) {
-                _files[idx] << output << std::endl;
-                _files[idx].flush();
-            }
-        }
-        if (levels & ERROR) {
-            int idx = _level_to_index(ERROR);
-            if (idx >= 0 && _files[idx].is_open()) {
-                _files[idx] << output << std::endl;
-                _files[idx].flush();
-            }
-        }
-    }
+Console::Stream& Console::log(int level, const std::string& prefix) {
+    _stream.reset(level, prefix);
+    return _stream;
 }
 
-void Console::debug(const std::string& msg, const std::string& prefix) {log(DEBUG, msg, prefix); }
-void Console::info(const std::string& msg, const std::string& prefix) {log(INFO, msg, prefix); }
-void Console::warning(const std::string& msg, const std::string& prefix) { log(WARNING, msg, prefix); }
-void Console::error(const std::string& msg, const std::string& prefix) { log(ERROR, msg, prefix); }
+Console::Stream& Console::debug(const std::string& prefix) { return log(DEBUG, prefix); }
+Console::Stream& Console::info(const std::string& prefix)  { return log(INFO, prefix); }
+Console::Stream& Console::warning(const std::string& prefix) { return log(WARNING, prefix); }
+Console::Stream& Console::error(const std::string& prefix) { return log(ERROR, prefix); }
+
+
+Console::Stream::~Stream() { _console._log_internal(_level, _buffer.str(), _prefix); }
+Console::Stream::Stream(Console& console, int level, const std::string& prefix) : _console(console), _level(level), _prefix(prefix) {}
+
+void Console::Stream::reset(int level, const std::string& prefix) {
+	_level = level;
+	_prefix = prefix;
+	_buffer.str("");
+	_buffer.clear();
+}

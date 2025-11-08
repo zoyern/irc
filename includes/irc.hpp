@@ -15,6 +15,9 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -23,12 +26,13 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 #include <map>
 #include <iostream>
 
 
-
+#include <irc/Server/Epoll.hpp>
 #include <irc/Server.hpp>
 #include <irc/Client.hpp>
 #include <irc/Channel.hpp>

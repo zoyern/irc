@@ -1,16 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Client.cpp                                         :+:      :+:    :+:   */
+/*   Stream.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/06 03:55:49 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/06 03:55:49 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/08 02:13:03 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/08 02:13:03 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+#pragma once
 #include <irc.hpp>
 
-Client::~Client() {}
-Client::Client() {}
+template<typename T>
+Console::Stream	&Console::Stream::operator<<(const T& value) { _buffer << value; return (*this); }

@@ -1,25 +1,19 @@
 #include <irc.hpp>
 
-Channel::Channel(void) :_name("NULL")
+Channel::~Channel() {}
+Channel::Channel(const std::string &name)
+	: _name(name)
+	, _password("")
+	, _topic("topic for :" + name)
+	, _operator(-1), _size(-1)
+	, _invite_only(false)
+	, _restricted_topic(false)
 {}
-Channel::Channel(std::string name): _name(name)
-{return;}
-Channel::Channel(const Channel& other);
-Channel& Channel::operator=(const Channel& other);
-Channel& Channel::name(const std::string& name)
-{
-	_name = name;
-}
-Channel& Channel::password(const std::string& pass)
-{
-	_password = pass;
-}
-// Channel& Channel::op(const std::string& name)
-// {
-// 	_op =
-// }
-// Channel& Channel::size(const std::string& address);
-// Channel& Channel::invite_only(const std::string &msg);
-// Channel& Channel::restricted_topic (int max);
-// Channel& Channel::topic(int reserved);
-Channel::~Channel(void){return;}
+
+Channel	&Channel::password(const std::string& pass) { _password = pass; return (*this); }
+Channel	&Channel::topic(const std::string& topic) { _topic = topic; return (*this); }
+Channel	&Channel::op(int op) { _operator = op; return (*this); }
+Channel	&Channel::size(int size) { _size = size; return (*this); }
+Channel	&Channel::invite_only(bool inv_only) { _invite_only = inv_only; return (*this); }
+Channel	&Channel::restricted_topic(bool rest_topic) { _restricted_topic = rest_topic; return (*this); }
+
