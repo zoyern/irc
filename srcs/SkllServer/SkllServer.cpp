@@ -13,25 +13,28 @@
 #include <Sockell/SkllServer.hpp>
 //port, ADDRESS, MAX_CLIENTS, RESERVED_FD, TIMEOUT, QUEUE
 SkllServer::~SkllServer() {}
-SkllServer::SkllServer(const std::string &port, const std::string &password)
+SkllServer::SkllServer(const std::string &port, const std::string &password, const std::string &name, const std::string &msg)
 	: errors(SkllErrors())
-	, network(SkllNetwork())
-	, protocol(SkllProtocol())
+	, network(SkllNetwork(port))
 	, hooks(SkllHook())
 	, console(SkllConsole::instance())
     , _fd(0)
 	, _running(false)
 	, _password(password)
-	, _name(SKLL_NAME)
-	, _connexion_msg(SKLL_MSG)
+	, _name(name)
+	, _connexion_msg(msg)
 	, _default_channel(NULL)
 {
-	(void)port;
     console.log(INFO | WARNING, "SkllServer") << ":[ " << _name << " ] Initialized on port : [ " << network.get_address() << ":" << network.get_port() << " ]";
     console.log() << ":[max clients : " << network.get_max_client() << " ]";
 }
 
-SkllServer::SkllServer(const SkllServer& other) : console(other.console) { *this = other; }
+SkllServer::SkllServer(const SkllServer& other) 
+	: errors(other.errors)
+	, network(other.network)
+	, hooks(other.hooks)
+	, console(other.console)
+{ *this = other; }
 
 SkllServer&	SkllServer::operator=(const SkllServer& other) {
 	if (this == &other) return (*this);

@@ -15,11 +15,10 @@
 
 class SkllProtocol {
 	private:
-		std::string _name;
-		std::string _delimiter;
-		bool _binary;
-		int _transport;
-		int _buffer_size;
+		std::string _crlf;
+		bool		_binary;
+		int			_transport;
+		int			_buffer_size;
 
 		//hooks
 	public:

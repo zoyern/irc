@@ -12,37 +12,17 @@
 
 #include <Sockell.hpp>
 
-void on_channel_start(SkllChannel &srv, void* data) {
-    (void)data;
-    srv.console.info("Channel") << "Channel started on " << srv.address() << ":" << srv.port();
-}
+void	on_channel_start() { srv.console.info("Channel") << "SkllServer started on "; }
+void	on_channel_update() {}
+void	on_channel_shutdown() { srv.console.info("Channel") << "SkllServer shutting down."; }
+void	on_channel_connect() { srv.console.info("Channel") << "Client connected: fd="; }
+void	on_channel_disconnect() { srv.console.info("Channel") << "Client disconnected: fd=";}
+void	on_channel_error() { srv.console.info("Channel") << "Client on_channel_error: fd=";}
+void	on_channel_timeout() { srv.console.info("Channel") << "Client on_channel_timeout: fd=";}
+void	on_channel_recv() { srv.console.info("Channel") << "Received: "; }
+void	on_channel_send() { srv.console.info("Channel") << "Send: "; }
 
-void on_channel_update(SkllChannel &srv, void* data) {
-    (void)srv;
-	(void)data;
-}
-
-void on_channel_shutdown(SkllChannel &srv, void* data) {
-    (void)data;
-    srv.console.info("Channel") << "Channel shutting down.";
-}
-
-void on_channel_connect(SkllChannel &srv, void* data) {
-    int fd = *reinterpret_cast<int*>(data);
-    srv.console.info("Channel") << "Client connected: fd=" << fd;
-}
-
-void on_channel_disconnect(SkllChannel &srv, void* data) {
-    int fd = *reinterpret_cast<int*>(data);
-    srv.console.info("Channel") << "Client disconnected: fd=" << fd;
-}
-
-void on_channel_recv(SkllChannel &srv, void* data) {
-    std::string msg = reinterpret_cast<std::string*>(data);
-    srv.console.debug("Channel") << "Received: " << *msg;
-}
-
-void on_channel_error(SkllChannel &srv, void* data) {
-    int code = *reinterpret_cast<int*>(data);
-    srv.console.error("Channel") << "Error code: " << code;
-}
+void	handle_kick() { srv.console.info("Channel") << "handle_kick: "; }
+void	handle_invite() { srv.console.info("Channel") << "handle_invite: "; }
+void	handle_topic() { srv.console.info("Channel") << "handle_topic: "; }
+void	handle_mode() { srv.console.info("Channel") << "handle_mode: "; }

@@ -12,37 +12,16 @@
 
 #include <Sockell.hpp>
 
-void on_start(SkllServer &srv, void* data) {
-    (void)data;
-    srv.console.info("SkllServer") << "SkllServer started on " << srv.address() << ":" << srv.port();
-}
+void	on_start() { srv.console.info("main") << "SkllServer started on "; }
+void	on_update() {}
+void	on_shutdown() { srv.console.info("main") << "SkllServer shutting down."; }
+void	on_connect() { srv.console.info("main") << "Client connected: fd="; }
+void	on_disconnect() { srv.console.info("main") << "Client disconnected: fd=";}
+void	on_error() { srv.console.info("main") << "Client on_error: fd=";}
+void	on_timeout() { srv.console.info("main") << "Client on_timeout: fd=";}
+void	on_recv() { srv.console.info("main") << "Received: "; }
+void	on_send() { srv.console.info("main") << "Send: "; }
 
-void on_update(SkllServer &srv, void* data) {
-    (void)srv;
-	(void)data;
-}
-
-void on_shutdown(SkllServer &srv, void* data) {
-    (void)data;
-    srv.console.info("SkllServer") << "SkllServer shutting down.";
-}
-
-void on_connect(SkllServer &srv, void* data) {
-    int fd = *reinterpret_cast<int*>(data);
-    srv.console.info("SkllServer") << "Client connected: fd=" << fd;
-}
-
-void on_disconnect(SkllServer &srv, void* data) {
-    int fd = *reinterpret_cast<int*>(data);
-    srv.console.info("SkllServer") << "Client disconnected: fd=" << fd;
-}
-
-void on_recv(SkllServer &srv, void* data) {
-    std::string msg = reinterpret_cast<std::string*>(data);
-    srv.console.debug("SkllServer") << "Received: " << *msg;
-}
-
-void on_error(SkllServer &srv, void* data) {
-    int code = *reinterpret_cast<int*>(data);
-    srv.console.error("SkllServer") << "Error code: " << code;
-}
+void	handle_nick() { srv.console.info("main") << "handle_nick: "; }
+void	handle_join() { srv.console.info("main") << "handle_join: "; }
+void	handle_privmsg() { srv.console.info("main") << "handle_privmsg: "; }

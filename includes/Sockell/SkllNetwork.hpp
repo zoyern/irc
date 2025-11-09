@@ -18,27 +18,15 @@
 #include <Sockell/SkllConsole.hpp>
 
 enum e_skllprotocol {
-	PROTO_TCP	= 1 << 0,
-	PROTO_UDP	= 1 << 1,
-};
-
-enum e_skllevent {
-	ON_START		= 1 << 0,
-	ON_UPDATE		= 1 << 1,
-	ON_SHUTDOWN		= 1 << 2,
-	ON_CONNECT		= 1 << 3,
-	ON_DISCONNECT	= 1 << 4,
-	ON_ERROR		= 1 << 5,
-	ON_TIMEOUT		= 1 << 6,
-	ON_SEND			= 1 << 7,
-	ON_RECV			= 1 << 8
+	SKLL_TCP	= 1 << 0,
+	SKLL_UDP	= 1 << 1,
 };
 
 #define SKLL_NAME			"irc"
 #define SKLL_ADDRESS		"0.0.0.0"
 #define SKLL_MAX_CLIENTS	-1
-#define SKLL_RESERVED_FD		10
-#define SKLL_TIMEOUT			300
+#define SKLL_RESERVED_FD	10
+#define SKLL_TIMEOUT		300
 #define SKLL_QUEUE 			128
 
 // ================================
@@ -70,9 +58,13 @@ class SkllNetwork {
 	// ================================
 	public:
 		~SkllNetwork();
-		SkllNetwork();
+		SkllNetwork(const std::string &port);
 		SkllNetwork(const SkllNetwork& other);
 		SkllNetwork&	operator=(const SkllNetwork& other);
+
+		int		run();
+		void	stop();
+		void	clean();
 	// ================================
 	// Private funcs
 	// ================================
@@ -92,6 +84,7 @@ class SkllNetwork {
 		SkllNetwork	&set_reserved_fds(int reserved);
 		SkllNetwork	&set_timeout(int seconds);
 		SkllNetwork	&set_queue(int backlog);
+		SkllNetwork	&set_protocol(const std::string &crlf, bool binary = false, int protocol = SKLL_TCP, int buffer_size = 512);
 
 		std::string &get_address();
 		uint16_t	&get_port();
