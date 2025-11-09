@@ -71,6 +71,7 @@ class SkllNetwork {
 	private:
 		uint16_t 	_check_port(const std::string &port);
 		void		_update_reserved_fds(int delta);
+		int			_init_socket();
 		int			_init_limit(int max);
 		int			_init_reserved(int reserved);
 

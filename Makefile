@@ -11,17 +11,16 @@
 # **************************************************************************** #
 
 NAME        = ircserv
-LIB_NAME    = libirc.a
+LIB_NAME    = sockell
 
 SRC_DIR     = srcs
 MAIN_DIR    = main
 INC_DIR     = includes
-INC_DIR_A   = Sockell
 BUILD_DIR   = builds
 OBJ_DIR     = $(BUILD_DIR)/obj
 DEP_DIR     = $(BUILD_DIR)/dep
 LIB_DIR     = $(BUILD_DIR)
-LIB         = $(LIB_DIR)/$(LIB_NAME)
+LIB         = $(LIB_DIR)/lib$(LIB_NAME).a
 
 CC          = c++
 CFLAGS      = -Wall -Wextra -Werror -g3 -std=c++98 -I$(INC_DIR)
@@ -34,7 +33,8 @@ SRCS        +=	SkllErrors/SkllErrors.cpp
 
 SRCS        +=	SkllHook/SkllHook.cpp
 
-SRCS        +=	SkllNetwork/SkllNetwork.cpp
+SRCS        +=	SkllNetwork/SkllNetwork.cpp \
+				SkllNetwork/SkllNetwork_private.cpp \
 
 SRCS        +=	SkllProtocol/SkllProtocol.cpp
 
@@ -59,6 +59,7 @@ MAIN_SRCS   = main.cpp hook_server.cpp hook_channel.cpp
 
 SRCS_FULL   = $(addprefix $(SRC_DIR)/, $(SRCS))
 MAIN_FULL   = $(addprefix $(MAIN_DIR)/, $(MAIN_SRCS))
+
 OBJS        = $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS_FULL))
 MAIN_OBJ    = $(patsubst $(MAIN_DIR)/%.cpp, $(OBJ_DIR)/main/%.o, $(MAIN_FULL))
 DEPS        = $(patsubst %.o, $(DEP_DIR)/%.d, $(OBJS) $(MAIN_OBJ))
@@ -72,7 +73,7 @@ all: $(NAME)
 
 $(NAME): $(LIB) $(MAIN_OBJ)
 	@echo "$(YELLOW)Linking $(NAME)...$(RESET)"
-	@$(CC) $(CFLAGS) $(MAIN_OBJ) -L$(LIB_DIR) -l$(INC_DIR_A) -o $(NAME)
+	@$(CC) $(CFLAGS) $(MAIN_OBJ) -L$(LIB_DIR) -l$(LIB_NAME) -o $(NAME)
 	@echo "$(GREEN)✓ Compilation réussie !$(RESET)"
 
 $(LIB): $(OBJS)

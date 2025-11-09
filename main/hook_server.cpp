@@ -11,17 +11,18 @@
 /* ************************************************************************** */
 
 #include <Sockell.hpp>
+#include <Sockell/SkllConsole.hpp>
 
-void	on_start() { srv.console.info("main") << "SkllServer started on "; }
+void	on_start() { SkllConsole::instance().info("main") << "SkllServer started on "; }
 void	on_update() {}
-void	on_shutdown() { srv.console.info("main") << "SkllServer shutting down."; }
-void	on_connect() { srv.console.info("main") << "Client connected: fd="; }
-void	on_disconnect() { srv.console.info("main") << "Client disconnected: fd=";}
-void	on_error() { srv.console.info("main") << "Client on_error: fd=";}
-void	on_timeout() { srv.console.info("main") << "Client on_timeout: fd=";}
-void	on_recv() { srv.console.info("main") << "Received: "; }
-void	on_send() { srv.console.info("main") << "Send: "; }
+void	on_shutdown() { SkllConsole::instance().info("main") << "SkllServer shutting down."; }
+void	on_connect() { SkllConsole::instance().info("main") << "Client connected: fd="; }
+void	on_disconnect() { SkllConsole::instance().info("main") << "Client disconnected: fd=";}
+void	on_error() { SkllConsole::instance().info("main") << "Client on_error: fd=";}
+void	on_timeout() { SkllConsole::instance().info("main") << "Client on_timeout: fd=";}
+void	on_recv() { SkllConsole::instance().info("main") << "Received: "; }
+void	on_send() { SkllConsole::instance().info("main") << "Send: "; }
 
-void	handle_nick() { srv.console.info("main") << "handle_nick: "; }
-void	handle_join() { srv.console.info("main") << "handle_join: "; }
-void	handle_privmsg() { srv.console.info("main") << "handle_privmsg: "; }
+void	handle_nick() { SkllConsole::instance().info("main") << "handle_nick: "; }
+void	handle_join() { SkllConsole::instance().info("main") << "handle_join: "; }
+void	handle_privmsg() { SkllConsole::instance().info("main") << "handle_privmsg: "; }

@@ -55,7 +55,7 @@ int main(int argc, char const **argv)
         // ================================
         // Channels
         // ================================ // re réflechir a comment le serveur utilise channel
-       srv.channel.hook.
+       /*srv.channel.hook.
 			.on(ON_START, &on_channel_start, NULL)
 			.on(ON_UPDATE, &on_channel_update, NULL)
 			.on(ON_SHUTDOWN, &on_channel_shutdown, NULL)
@@ -68,7 +68,7 @@ int main(int argc, char const **argv)
 			.on("KICK", &handle_kick, NULL)
 			.on("INVITE", &handle_invite, NULL)
 			.on("TOPIC", &handle_topic, NULL)
-			.on("MODE", &handle_mode, NULL);
+			.on("MODE", &handle_mode, NULL);*/
 
 		srv.channel(CHANNEL_NAME, CHANNEL_DEFAULT)
 			.password("")
