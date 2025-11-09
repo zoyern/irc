@@ -10,59 +10,92 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <irc.hpp>
+#include "irc.hpp"
 
-void start(Server &server, void* data) {
-	(void)data;
-	(void)server;
-	Console::instance().info("Server") << "Server started.";
-}
-
-void update(Server &server, void* data) {
-	(void)data;
-	(void)server;
-}
-
-void shutdown(Server &server, void* data) {
-	(void)data;
-	(void)server;
-	Console::instance().info("Server") << "Server shutting down.";
-}
-
-void on_connect(Server &server, void* data) {
-	(void)data;
-	(void)server;
-	Console::instance().info("Server") << "New client connected.";
-}
-
-void on_disconnect(Server &server, void* data) {
-	(void)data;
-	(void)server;
-	Console::instance().info("Server") << "Client disconnected.";
-}
+// ================================
+// Main
+// ================================
 
 int main(int argc, char const **argv)
 {
-	if (argc != 3) return (std::cerr << "Usage: " << argv[0] << " <port> <password>" << std::endl, 1);
-	try {
-		Server srv(argv[1], argv[2]);
-		srv.name("irc")
-			.address("0.0.0.0")
-			.connexion_msg(MSG)
-			.max_clients(MAX_CLIENTS)
-			.reserved_fds(RESERVED_FD)
-			.timeout(TIMEOUT)
-			.queue(QUEUE)
-			.hook(ON_START, &start, NULL)
-			.hook(ON_UPDATE, &update, NULL)
-			.hook(ON_SHUTDOWN, &shutdown, NULL)
-			.hook(ON_CONNECT, &on_connect, NULL)
-			.hook(ON_DISCONNECT, &on_disconnect, NULL);
+    if (argc != 3)
+        return (Console::instance().error("Usage") << "./ircserv <protocol> [port]", 1);
 
-		srv.channel(CHANNEL_NAME, CHANNEL_DEFAULT).password("").op(CHANNEL_OPERATOR).size(CHANNEL_SIZE)
-			.invite_only(CHANNEL_INV_ONLY).restricted_topic(CHANNEL_REST_TOPIC).topic(CHANNEL_TOPIC);
-		return (srv.run());
-	}
-	catch (std::exception &e){return (std::cerr << "Error: " << e.what() << std::endl,1);}
-	return (0);
+    try {
+        SkllServer srv(argv[1], argv[2]);
+
+        // ================================
+        // Configuration générale
+        // ================================
+        srv.network
+			.name("ircserv")               // Nom serveur
+			.address("0.0.0.0")            // Écoute sur toutes les interfaces
+			.connexion_msg("Welcome!")     // Message de connexion
+			.max_clients(100)              // Limite clients
+			.reserved_fds(10)              // RéSkllServer FDs
+			.timeout(30)                   // Timeout en secondes
+			.queue(128);                   // Queue backlog
+
+        // ================================
+        // Hooks
+        // ================================
+        srv.hooks
+			.on(ON_START, &start, NULL)
+			.on(ON_UPDATE, &update, NULL)
+			.on(ON_SHUTDOWN, &shutdown, NULL)
+			.on(ON_CONNECT, &on_connect, NULL)
+			.on(ON_DISCONNECT, &on_disconnect, NULL)
+			.on(ON_ERROR, &on_error, NULL)
+			.on(ON_TIMEOUT, &on_timeout, NULL)
+			.on(ON_RECV, &on_recv, NULL)
+			.on(ON_SEND, &on_send, NULL);
+
+        // ================================
+        // Protocole IRC
+        // ================================
+        srv.protocol("irc", "\r\n", false, TCP)
+           .buffer_size(2048)
+           .on("NICK", handle_nick, NULL)
+           .on("JOIN", handle_join, NULL)
+           .on("PRIVMSG", handle_privmsg, NULL)
+
+		   // commandes server
+		   // commandes channels
+
+        // ================================
+        // Channels
+        // ================================ // re réflechir a comment le serveur utilise channel
+        srv.channel.add(CHANNEL_NAME, CHANNEL_DEFAULT)
+           .password("")
+           .op(CHANNEL_OPERATOR)
+           .size(CHANNEL_SIZE)
+           .invite_only(CHANNEL_INV_ONLY)
+           .restricted_topic(CHANNEL_REST_TOPIC)
+           .topic(CHANNEL_TOPIC)
+
+			.on("NICK", handle_nick, NULL)
+           .on("JOIN", handle_join, NULL)
+           .on("PRIVMSG", handle_privmsg, NULL)
+		
+		   .hook(ON_START, &start, NULL)
+           .hook(ON_UPDATE, &update, NULL)&
+           .hook(ON_SHUTDOWN, &shutdown, NULL)
+           .hook(ON_CONNECT, &on_connect, NULL)
+           .hook(ON_DISCONNECT, &on_disconnect, NULL)
+           .hook(ON_ERROR, &on_error, NULL)
+           .hook(ON_TIMEOUT, &on_timeout, NULL)
+           .hook(ON_RECV, &on_recv, NULL)
+           .hook(ON_SEND, &on_send, NULL);
+
+
+        // ================================
+        // Lancement du serveur
+        // ================================
+        return srv.run();
+    }
+    catch (std::exception &e) {
+        return (std::cerr << "Error: " << e.what() << std::endl, 1);
+    }
+
+    return 0;
 }

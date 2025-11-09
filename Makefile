@@ -16,6 +16,7 @@ LIB_NAME    = libirc.a
 SRC_DIR     = srcs
 MAIN_DIR    = main
 INC_DIR     = includes
+INC_DIR_A   = Sockell
 BUILD_DIR   = builds
 OBJ_DIR     = $(BUILD_DIR)/obj
 DEP_DIR     = $(BUILD_DIR)/dep
@@ -29,24 +30,32 @@ AR          = ar rcs
 
 SRCS		= signals.cpp
 
-SRCS        +=	Server/Server.cpp \
-				Server/Server_public.cpp \
-				Server/Server_private.cpp \
-				Server/Epoll/Epoll.cpp
+SRCS        +=	SkllErrors/SkllErrors.cpp
 
-SRCS        +=	Client/Client.cpp \
-				Client/Client_public.cpp \
-				Client/Client_private.cpp
+SRCS        +=	SkllHook/SkllHook.cpp
 
-SRCS        +=	Channel/Channel.cpp \
-				Channel/Channel_public.cpp \
-				Channel/Channel_private.cpp
+SRCS        +=	SkllNetwork/SkllNetwork.cpp
 
-SRCS        +=	Console/Console.cpp \
-				Console/Console_public.cpp \
-				Console/Console_private.cpp
+SRCS        +=	SkllProtocol/SkllProtocol.cpp
 
-MAIN_SRCS   = main.cpp
+SRCS        +=	SkllConsole/SkllConsole.cpp \
+				SkllConsole/SkllConsole_public.cpp \
+				SkllConsole/SkllConsole_private.cpp
+
+SRCS        +=	SkllClient/SkllClient.cpp \
+				SkllClient/SkllClient_public.cpp \
+				SkllClient/SkllClient_private.cpp
+
+SRCS        +=	SkllChannel/SkllChannel.cpp \
+				SkllChannel/SkllChannel_public.cpp \
+				SkllChannel/SkllChannel_private.cpp
+
+SRCS        +=	SkllServer/SkllServer.cpp \
+				SkllServer/SkllServer_public.cpp \
+				SkllServer/SkllServer_private.cpp
+
+
+MAIN_SRCS   = main.cpp hook_server.cpp hook_channel.cpp
 
 SRCS_FULL   = $(addprefix $(SRC_DIR)/, $(SRCS))
 MAIN_FULL   = $(addprefix $(MAIN_DIR)/, $(MAIN_SRCS))
@@ -63,7 +72,7 @@ all: $(NAME)
 
 $(NAME): $(LIB) $(MAIN_OBJ)
 	@echo "$(YELLOW)Linking $(NAME)...$(RESET)"
-	@$(CC) $(CFLAGS) $(MAIN_OBJ) -L$(LIB_DIR) -lirc -o $(NAME)
+	@$(CC) $(CFLAGS) $(MAIN_OBJ) -L$(LIB_DIR) -l$(INC_DIR_A) -o $(NAME)
 	@echo "$(GREEN)✓ Compilation réussie !$(RESET)"
 
 $(LIB): $(OBJS)
