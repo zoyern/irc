@@ -12,5 +12,5 @@
 
 #include <Sockell/SkllErrors.hpp>
 
-SkllErrors::~SkllErrors() {};
-SkllErrors::SkllErrors() {};
+SkllErrors::~SkllErrors() {}
+SkllErrors::SkllErrors() {}

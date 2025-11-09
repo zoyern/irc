@@ -10,6 +10,6 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell.hpp>
+#include <Sockell/SkllHook.hpp>
 
 // toute la logique de hook que utilise channel et SkllServer et peut-etre client 

@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Console_public.cpp                                 :+:      :+:    :+:   */
+/*   SkllConsole_public.cpp                                 :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,12 +10,12 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell.hpp>
+#include <Sockell/SkllConsole.hpp>
 
-Console& Console::enable(e_loglevel levels) {_enabled_levels |= static_cast<int>(levels); return *this; }
-Console& Console::disable(e_loglevel levels) {_enabled_levels &= ~static_cast<int>(levels); return *this; }
-Console& Console::to_stdout(bool enable) { _out_stdout = enable; return *this; }
-Console& Console::to_file(const std::string& path) {
+SkllConsole& SkllConsole::enable(e_loglevel levels) {_enabled_levels |= static_cast<int>(levels); return *this; }
+SkllConsole& SkllConsole::disable(e_loglevel levels) {_enabled_levels &= ~static_cast<int>(levels); return *this; }
+SkllConsole& SkllConsole::to_stdout(bool enable) { _out_stdout = enable; return *this; }
+SkllConsole& SkllConsole::to_file(const std::string& path) {
     if (!_active) return *this;
     
     size_t last_slash = path.find_last_of("/\\");
@@ -58,14 +58,14 @@ Console& Console::to_file(const std::string& path) {
     return *this;
 }
 
-int Console::get_file_count() const {
+int SkllConsole::get_file_count() const {
     if (!_out_file) return (0);
     int count = 0;
     for (int i = 0; i < LOG_LEVEL; i++) {if (_files[i].is_open()) count++;}
     return (count);
 }
 
-bool Console::is_active() const { return _active; }
-void Console::start() { _active = true; }
-void Console::stop() { _active = false; }
+bool SkllConsole::is_active() const { return _active; }
+void SkllConsole::start() { _active = true; }
+void SkllConsole::stop() { _active = false; }
 

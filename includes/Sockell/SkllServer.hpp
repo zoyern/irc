@@ -13,6 +13,13 @@
 #pragma once
 
 #include <Sockell.hpp>
+#include <Sockell/SkllErrors.hpp>
+#include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllNetwork.hpp>
+#include <Sockell/SkllProtocol.hpp>
+#include <Sockell/SkllConsole.hpp>
+#include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllChannel.hpp>
 
 class SkllErrors;
 class SkllHook;
@@ -66,7 +73,7 @@ class SkllServer {
 		void	stop();
 		void	clean();
 
-		Channel& channel(const std::string &name, bool is_default = false);
+		SkllChannel& channel(const std::string &name, bool is_default = false);
 	// ================================
 	// Private funcs
 	// ================================

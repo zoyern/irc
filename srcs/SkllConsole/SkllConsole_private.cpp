@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Console_private.cpp                                :+:      :+:    :+:   */
+/*   SkllConsole_private.cpp                                :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,9 +10,9 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell.hpp>
+#include <Sockell/SkllConsole.hpp>
 
-void Console::_create_directories(const std::string& path) {
+void SkllConsole::_create_directories(const std::string& path) {
     if (path.empty()) return;
     
     std::string dir_path = "";
@@ -29,7 +29,7 @@ void Console::_create_directories(const std::string& path) {
     }
 }
 
-void Console::_log_internal(int levels, const std::string& msg, const std::string& prefix) {
+void SkllConsole::_log_internal(int levels, const std::string& msg, const std::string& prefix) {
     if (!_active) return;
     
     std::string output = _format(levels, msg, prefix);
@@ -49,7 +49,7 @@ void Console::_log_internal(int levels, const std::string& msg, const std::strin
     }
 }
 
-std::string Console::_get_timestamp_filename() const {
+std::string SkllConsole::_get_timestamp_filename() const {
     time_t now = time(NULL);
     struct tm* tm_info = localtime(&now);
     
@@ -65,7 +65,7 @@ std::string Console::_get_timestamp_filename() const {
 }
 
 
-std::string Console::_timestamp() const {
+std::string SkllConsole::_timestamp() const {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     
@@ -84,7 +84,7 @@ std::string Console::_timestamp() const {
     return ss.str();
 }
 
-std::string Console::_format(int levels, const std::string& msg, const std::string& prefix) const {
+std::string SkllConsole::_format(int levels, const std::string& msg, const std::string& prefix) const {
     std::ostringstream output;
     
     output << "[" << _timestamp() << "]";

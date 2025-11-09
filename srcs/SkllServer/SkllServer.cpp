@@ -10,8 +10,8 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell.hpp>
-
+#include <Sockell/SkllServer.hpp>
+//port, ADDRESS, MAX_CLIENTS, RESERVED_FD, TIMEOUT, QUEUE
 SkllServer::~SkllServer() {}
 SkllServer::SkllServer(const std::string &port, const std::string &password)
 	: errors(SkllErrors())
@@ -19,21 +19,16 @@ SkllServer::SkllServer(const std::string &port, const std::string &password)
 	, protocol(SkllProtocol())
 	, hooks(SkllHook())
 	, console(SkllConsole::instance())
-    , _fd(_init_socket())
+    , _fd(0)
 	, _running(false)
-	, _port(_check_port(port))
 	, _password(password)
-	, _name(NAME)
-	, _address(ADDRESS)
-	, _connexion_msg(MSG)
-	, _max_clients(_init_limit(MAX_CLIENTS))
-	, _reserved_fds(_init_reserved(RESERVED_FD))
-	, _timeout(TIMEOUT)
-	, _queue(QUEUE)
+	, _name(SKLL_NAME)
+	, _connexion_msg(SKLL_MSG)
 	, _default_channel(NULL)
 {
-    console.log(INFO | WARNING, "SkllServer") << ":[ " << _name << " ] Initialized on port : [ " << _address << ":" << _port << " ]";
-    console.log() << ":[max clients : " << _max_clients << " ]";
+	(void)port;
+    console.log(INFO | WARNING, "SkllServer") << ":[ " << _name << " ] Initialized on port : [ " << network.get_address() << ":" << network.get_port() << " ]";
+    console.log() << ":[max clients : " << network.get_max_client() << " ]";
 }
 
 SkllServer::SkllServer(const SkllServer& other) : console(other.console) { *this = other; }
@@ -43,15 +38,9 @@ SkllServer&	SkllServer::operator=(const SkllServer& other) {
 	return (
 		_fd = other._fd,
 		_running = other._running,
-		_port = other._port,
 		_password = other._password,
 		_name = other._name,
-		_address = other._address,
 		_connexion_msg = other._connexion_msg,
-		_max_clients = other._max_clients,
-		_reserved_fds = other._reserved_fds,
-		_timeout = other._timeout,
-		_queue = other._queue,
 		_default_channel = other._default_channel,
 		_channels = other._channels,
 		_clients = other._clients,
@@ -59,7 +48,7 @@ SkllServer&	SkllServer::operator=(const SkllServer& other) {
 }
 
 int		SkllServer::run() { 
-	return (console.info("SkllServer") << "Listening on " << _address << ":" << _port, 0);
+	return (console.info("SkllServer") << "Listening on " << network.get_address() << ":" << network.get_port(), 0);
 }
 
 void	SkllServer::stop() { _running = false; }
@@ -77,6 +66,6 @@ SkllChannel& SkllServer::channel(const std::string& name, bool is_default) {
     // TODO: implémenter correctement
     (void)name;
     (void)is_default;
-    static Channel dummy("dummy");
+    static SkllChannel dummy("dummy");
     return (dummy);
 }

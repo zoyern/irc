@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell.hpp>
+#include <Sockell/SkllClient.hpp>
 
-Client::~Client() {}
-Client::Client() {}
+SkllClient::~SkllClient() {}
+SkllClient::SkllClient() {}
