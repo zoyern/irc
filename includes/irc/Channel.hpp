@@ -34,16 +34,14 @@ class Channel {
 		int			_size;
 		bool		_invite_only;
 		bool		_restricted_topic;
-public:
-	Channel(const std::string &name);
-	~Channel();
+	public:
+		Channel(const std::string &name);
+		~Channel();
 
-	Channel	&password(const std::string& pass);
-	Channel	&topic(const std::string& topic);
-	Channel	&op(int op);
-	Channel	&size(int size);
-	Channel	&invite_only(bool inv_only);
-	Channel	&restricted_topic(bool rest_topic);
-
-
+		Channel	&password(const std::string& pass);
+		Channel	&topic(const std::string& topic);
+		Channel	&op(int op);
+		Channel	&size(int size);
+		Channel	&invite_only(bool inv_only);
+		Channel	&restricted_topic(bool rest_topic);
 };
