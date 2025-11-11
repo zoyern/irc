@@ -15,12 +15,8 @@
 #include <Sockell.hpp>
 #include <Sockell/SkllErrors.hpp>
 #include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllProtocol.hpp>
 #include <Sockell/SkllConsole.hpp>
-
-enum e_skllprotocol {
-	SKLL_TCP	= 1 << 0,
-	SKLL_UDP	= 1 << 1,
-};
 
 #define SKLL_NAME			"irc"
 #define SKLL_ADDRESS		"0.0.0.0"
@@ -53,6 +49,8 @@ class SkllNetwork {
 		uint16_t	_port;
 		std::string	_address;
 
+	std::map<std::string, SkllProtocol*> _protocols;
+
 	// ================================
 	// Public funcs
 	// ================================
@@ -65,6 +63,9 @@ class SkllNetwork {
 		int		run();
 		void	stop();
 		void	clean();
+		void	handle();
+		void	send();
+		
 	// ================================
 	// Private funcs
 	// ================================
@@ -85,7 +86,7 @@ class SkllNetwork {
 		SkllNetwork	&set_reserved_fds(int reserved);
 		SkllNetwork	&set_timeout(int seconds);
 		SkllNetwork	&set_queue(int backlog);
-		SkllNetwork	&set_protocol(const std::string &crlf, bool binary = false, int protocol = SKLL_TCP, int buffer_size = 512);
+		SkllNetwork	&set_protocol(const std::string &crlf, bool binary, int protocol, int buffer_size = 512);
 
 		std::string &get_address();
 		uint16_t	&get_port();

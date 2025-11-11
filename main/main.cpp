@@ -18,8 +18,7 @@
 
 int main(int argc, char const **argv)
 {
-    if (argc != 3)
-        return (SkllConsole::instance().error("Usage") << "./ircserv <protocol> [port]", 1);
+    if (argc != 3) return (SkllConsole::instance().error("Usage") << "./ircserv <protocol> [port]", 1);
 
     try {
         SkllServer srv(argv[1], argv[2], "irc", SKLL_MSG);
@@ -32,8 +31,18 @@ int main(int argc, char const **argv)
 			.set_max_clients(100)              // Limite clients
 			.set_reserved_fds(10)              // RéSkllServer FDs
 			.set_timeout(30)                   // Timeout en secondes
-			.set_queue(128)                    // Queue backlog
-			.set_protocol("\r\n", false, SKLL_TCP, 2048);
+			.set_queue(128);                    // Queue backlog
+
+		//srv.network.protocol(SKLL_IPV4, SKLL_TCP, "0.0.0.0", 6667);
+
+		/*protocol.on(SKLL_IPV4, SKLL_TCP, "0.0.0.0", 6667)
+		.set_crlf("\r\n")
+		.set_binary(false)
+		.set_size(512);
+			protocol.on(SKLL_IPV4 | SKLL_IPV6, SKLL_TCP | UDP , "0.0.0.0", 8080);
+			protocol.on(SKLL_IPV6, SKLL_UDP, "0.0.0.0", 7777);
+*/
+
 	
 		// ================================
         // Hooks

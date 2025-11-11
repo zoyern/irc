@@ -46,7 +46,11 @@ SkllNetwork&	SkllNetwork::operator=(const SkllNetwork& other) {
 		*this);
 }
 
-int		SkllNetwork::run() { return (console.info("SkllNetwork") << "Listening on " << get_address() << ":" << get_port(), 0); }
+int		SkllNetwork::run() {
+	console.info("SkllNetwork") << "Listening on " << get_address() << ":" << get_port();
+
+	return (0);
+}
 void	SkllNetwork::stop() { _running = false; }
 void	SkllNetwork::clean() {
 	if (_epfd >= 0) { close(_epfd); _epfd = -1; }

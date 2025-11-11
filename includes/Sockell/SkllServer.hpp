@@ -52,6 +52,7 @@ class SkllServer {
 		std::string	_password;
 		std::string	_name;
 		std::string	_connexion_msg;
+		int			_max_client;
 
 		SkllChannel							*_default_channel;
 		std::map<std::string, SkllChannel*>	_channels;

@@ -101,6 +101,9 @@ fclean: clean
 	@rm -f $(NAME)
 	@echo "$(RED)Clean   : ./$(NAME)$(RESET)"
 
+s: all
+	./$(NAME) 6667 pass
+
 re: fclean all
 
 .PHONY: all clean fclean re

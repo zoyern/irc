@@ -5,6 +5,31 @@
 JOIN #general\r\n
 MODE #general +k 123\r\n
 
+
+socket(AF_INET | AF_INET6 | AF_UNIX, TCP | UDP, auto | TCP | UDP)
+int fd = socket(AF_INET, SOCK_STREAM, 0);  // TCP
+int fd_udp = socket(AF_INET, SOCK_DGRAM, 0);  // UDP
+
+ipv4 ipv6 local
+
+protocol.on(SKLL_IPV4, SKLL_TCP, "0.0.0.0", 6667)
+		.set_crlf("\r\n")
+		.set_binary(false)
+		.set_size(512);
+protocol.on(SKLL_IPV4 | SKLL_IPV6, SKLL_TCP | UDP , "0.0.0.0", 8080);
+protocol.on(SKLL_IPV6, SKLL_UDP, "0.0.0.0", 7777);
+
+
+int err = getaddrinfo(host, port, &hints, &res); //throw
+EAI_AGAIN	Résolution temporairement impossible (DNS down)
+EAI_FAIL	Échec permanent (ex: DNS invalide)
+EAI_NONAME	Host ou service introuvable
+EAI_MEMORY	Pas assez de mémoire
+EAI_FAMILY	Famille d’adresse non supportée (IPv6, etc.)
+
+
+TC
+
 ```cpp
 MAIN
 │
