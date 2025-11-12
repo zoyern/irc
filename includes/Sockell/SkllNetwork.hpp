@@ -41,7 +41,6 @@ class SkllNetwork {
 	// ================================
 	private:
 		int 		_epfd;
-		int			_max_clients;
 		int			_reserved_fds;
 		int 		_timeout;
 		int 		_queue;

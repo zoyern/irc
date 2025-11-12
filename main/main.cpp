@@ -21,12 +21,35 @@ int main(int argc, char const **argv)
     if (argc != 3) return (SkllConsole::instance().error("Usage") << "./ircserv <protocol> [port]", 1);
 
     try {
-        SkllServer srv(argv[1], argv[2], "irc", SKLL_MSG);
+		// on connect SKLL_MSG
+		// port -> protocol
+		// password oublie
+
+		// sockets mutiple 
+		// epoll qui est seul et qui peux géré plusieur socket
+		// reussir a séparer les option que ta avec ton genre tcp udp port adress
+		// epoll gere les events et la queue
+		// socket -> protocol tcp port fd
+		// epoll events la queue 
+
+		SkllServer srv();
+		srv.network(SKLL_QUEUE);
+		srv.hooks
+			.on(ON_START, &on_start, NULL)
+			.on(ON_UPDATE, &on_update, NULL)
+			.on(ON_SHUTDOWN, &on_shutdown, NULL)
+			.on(ON_CONNECT, &on_connect, NULL)
+			.on(ON_DISCONNECT, &on_disconnect, NULL)
+			.on(ON_ERROR, &on_error, NULL)
+			.on(ON_TIMEOUT, &on_timeout, NULL)
+			.on(ON_RECV, &on_recv, NULL)
+			.on(ON_SEND, &on_send, NULL);
 
         // ================================
         // Configuration générale
         // ================================
         srv.network
+			epoll
 			.set_address("0.0.0.0")            // Écoute sur toutes les interfaces
 			.set_max_clients(100)              // Limite clients
 			.set_reserved_fds(10)              // RéSkllServer FDs
@@ -42,24 +65,9 @@ int main(int argc, char const **argv)
 			protocol.on(SKLL_IPV4 | SKLL_IPV6, SKLL_TCP | UDP , "0.0.0.0", 8080);
 			protocol.on(SKLL_IPV6, SKLL_UDP, "0.0.0.0", 7777);
 */
-
-	
 		// ================================
         // Hooks
         // ================================
-        srv.hooks
-			.on(ON_START, &on_start, NULL)
-			.on(ON_UPDATE, &on_update, NULL)
-			.on(ON_SHUTDOWN, &on_shutdown, NULL)
-			.on(ON_CONNECT, &on_connect, NULL)
-			.on(ON_DISCONNECT, &on_disconnect, NULL)
-			.on(ON_ERROR, &on_error, NULL)
-			.on(ON_TIMEOUT, &on_timeout, NULL)
-			.on(ON_RECV, &on_recv, NULL)
-			.on(ON_SEND, &on_send, NULL)
-			.on("NICK", &handle_nick, NULL)
-			.on("JOIN", &handle_join, NULL)
-			.on("PRIVMSG", &handle_privmsg, NULL);
 
         // ================================
         // Channels

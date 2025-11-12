@@ -12,6 +12,7 @@
 
 #include <Sockell.hpp>
 #include <Sockell/SkllConsole.hpp>
+#include <Sockell/SkllServer.hpp>
 
 void	on_start() { SkllConsole::instance().info("main") << "SkllServer started on "; }
 void	on_update() {}
@@ -20,7 +21,16 @@ void	on_connect() { SkllConsole::instance().info("main") << "Client connected: f
 void	on_disconnect() { SkllConsole::instance().info("main") << "Client disconnected: fd=";}
 void	on_error() { SkllConsole::instance().info("main") << "Client on_error: fd=";}
 void	on_timeout() { SkllConsole::instance().info("main") << "Client on_timeout: fd=";}
-void	on_recv() { SkllConsole::instance().info("main") << "Received: "; }
+void	on_recv(/*SkllServer server, bitedef msg, void *data*/) { 
+		SkllConsole::instance().info("main") << "Received: "; 
+		/*	if (msg == ("NICK"))
+		.on("NICK", &handle_nick, NULL) // header perso
+		.on("JOIN", &handle_join, NULL)
+		.on(0x01, &handle_join, NULL)
+		.on("PRIVMSG", &handle_privmsg, NULL);
+	*/
+	}
+
 void	on_send() { SkllConsole::instance().info("main") << "Send: "; }
 
 void	handle_nick() { SkllConsole::instance().info("main") << "handle_nick: "; }
