@@ -11,19 +11,18 @@
 /* ************************************************************************** */
 
 #include <Sockell.hpp>
-#include <Sockell/SkllConsole.hpp>
 
-void	on_channel_start() { SkllConsole::instance().info("Channel") << "SkllServer started on "; }
+void	on_channel_start() { std::cout << "Channel SkllServer started on " << std::endl; }
 void	on_channel_update() {}
-void	on_channel_shutdown() { SkllConsole::instance().info("Channel") << "SkllServer shutting down."; }
-void	on_channel_connect() { SkllConsole::instance().info("Channel") << "Client connected: fd="; }
-void	on_channel_disconnect() { SkllConsole::instance().info("Channel") << "Client disconnected: fd=";}
-void	on_channel_error() { SkllConsole::instance().info("Channel") << "Client on_channel_error: fd=";}
-void	on_channel_timeout() { SkllConsole::instance().info("Channel") << "Client on_channel_timeout: fd=";}
-void	on_channel_recv() { SkllConsole::instance().info("Channel") << "Received: "; }
-void	on_channel_send() { SkllConsole::instance().info("Channel") << "Send: "; }
+void	on_channel_shutdown() { std::cout << "Channel SkllServer shutting down." << std::endl; }
+void	on_channel_connect() { std::cout << "Channel Client connected: fd=" << std::endl; }
+void	on_channel_disconnect() { std::cout << "Channel Client disconnected: fd=" << std::endl;}
+void	on_channel_error() { std::cout << "Channel Client on_channel_error: fd=" << std::endl;}
+void	on_channel_timeout() { std::cout << "Channel Client on_channel_timeout: fd=" << std::endl;}
+void	on_channel_recv() { std::cout << "Channel Received: " << std::endl; }
+void	on_channel_send() { std::cout << "Channel Send: " << std::endl; }
 
-void	handle_kick() { SkllConsole::instance().info("Channel") << "handle_kick: "; }
-void	handle_invite() { SkllConsole::instance().info("Channel") << "handle_invite: "; }
-void	handle_topic() { SkllConsole::instance().info("Channel") << "handle_topic: "; }
-void	handle_mode() { SkllConsole::instance().info("Channel") << "handle_mode: "; }
+void	handle_kick() { std::cout << "Channel handle_kick: " << std::endl; }
+void	handle_invite() { std::cout << "Channel handle_invite: " << std::endl; }
+void	handle_topic() { std::cout << "Channel handle_topic: " << std::endl; }
+void	handle_mode() { std::cout << "Channel handle_mode: " << std::endl; }

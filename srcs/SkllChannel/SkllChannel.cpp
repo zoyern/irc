@@ -12,20 +12,50 @@
 
 #include <Sockell/SkllChannel.hpp>
 
+SkllChannel::SkllChannel() : name(""), topic(""), password("") {}
+SkllChannel::SkllChannel(const std::string& n) : name(n), topic(""), password("") {}
 SkllChannel::~SkllChannel() {}
-SkllChannel::SkllChannel(const std::string &name)
-	: _name(name)
-	, _password("")
-	, _topic("topic for :" + name)
-	, _operator(-1), _size(-1)
-	, _invite_only(false)
-	, _restricted_topic(false)
+
+// Constructeur copie
+SkllChannel::SkllChannel(const SkllChannel& other)
+    : name(other.name), topic(other.topic), password(other.password)
 {}
 
-SkllChannel	&SkllChannel::password(const std::string& pass) { _password = pass; return (*this); }
-SkllChannel	&SkllChannel::topic(const std::string& topic) { _topic = topic; return (*this); }
-SkllChannel	&SkllChannel::op(int op) { _operator = op; return (*this); }
-SkllChannel	&SkllChannel::size(int size) { _size = size; return (*this); }
-SkllChannel	&SkllChannel::invite_only(bool inv_only) { _invite_only = inv_only; return (*this); }
-SkllChannel	&SkllChannel::restricted_topic(bool rest_topic) { _restricted_topic = rest_topic; return (*this); }
+SkllChannel& SkllChannel::operator=(const SkllChannel& other) {
+    if (this != &other) {
+        name = other.name;
+        topic = other.topic;
+        password = other.password;
+    }
+    return *this;
+}
 
+SkllChannel& SkllChannel::set_topic(const std::string& t) {
+    topic = t;
+    return *this;
+}
+
+SkllChannel& SkllChannel::set_password(const std::string& p) {
+    password = p;
+    return *this;
+}
+
+SkllChannel& SkllChannel::op(int flags) {
+    (void)flags;
+    return *this;
+}
+
+SkllChannel& SkllChannel::size(int max_users) {
+    (void)max_users;
+    return *this;
+}
+
+SkllChannel& SkllChannel::invite_only(bool enable) {
+    (void)enable;
+    return *this;
+}
+
+SkllChannel& SkllChannel::restricted_topic(bool enable) {
+    (void)enable;
+    return *this;
+}

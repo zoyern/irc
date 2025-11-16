@@ -11,86 +11,84 @@
 /* ************************************************************************** */
 
 #pragma once
-
-#include <Sockell.hpp>
-#include <Sockell/SkllErrors.hpp>
-#include <Sockell/SkllHook.hpp>
 #include <Sockell/SkllProtocol.hpp>
-#include <Sockell/SkllConsole.hpp>
+#include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllServer.hpp>
+#include <sys/epoll.h>
+#include <vector>
+#include <map>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+#include <cerrno>
+#include <sstream>
+#include <iostream>
 
-#define SKLL_NAME			"irc"
-#define SKLL_ADDRESS		"0.0.0.0"
-#define SKLL_MAX_CLIENTS	-1
-#define SKLL_RESERVED_FD	10
-#define SKLL_TIMEOUT		300
-#define SKLL_QUEUE 			128
+class SkllServer;
 
-// ================================
-// Sockell Network Class
-// ================================
 class SkllNetwork {
-	// ================================
-	// Public vars
-	// ================================
-	public:
-		SkllErrors		errors;
-		SkllHook		hooks;
-		SkllConsole		&console;
-	// ================================
-	// Private vars
-	// ================================
-	private:
-		int 		_epfd;
-		int			_reserved_fds;
-		int 		_timeout;
-		int 		_queue;
-		bool 		_running;
-		uint16_t	_port;
-		std::string	_address;
+private:
+    std::string _name;
+    int  _epfd;
+    int  _timeout;
+    int  _queue;
+    uint32_t _epoll_events;
+    
+    SkllServer* _server;
+    
+    std::vector<epoll_event> _events;
+    std::map<std::string, SkllProtocol>  _protocols_owned;
+    std::map<int, SkllProtocol*>         _fd_to_protocol;
 
-	std::map<std::string, SkllProtocol*> _protocols;
+public:
+    SkllHook hook;
+    
+    SkllNetwork();
+    SkllNetwork(const std::string& name, int timeout, int queue);
+    ~SkllNetwork();
+    
+    // ═══════════════════════════════════════════════════
+    // COPIE (PUBLIC pour std::map)
+    // ═══════════════════════════════════════════════════
+    SkllNetwork(const SkllNetwork& other);
+    SkllNetwork& operator=(const SkllNetwork& other);
+    
+    void run();
+    void update();
+    void set_server(SkllServer* srv);
+    
+    SkllProtocol& listen(const std::string& name, const std::string& addr, int port, int opts);
+    SkllProtocol& listen(SkllProtocol* proto);
+    
+    SkllNetwork& on(SkllEvent event, SkllCallback callback, void* data = NULL);
+    
+    // Setters
+    SkllNetwork& set_timeout(int milliseconds);
+    SkllNetwork& set_queue(int size);
+    SkllNetwork& set_events(uint32_t events);
+    SkllNetwork& set_edge_triggered(bool enable = true);
+    SkllNetwork& set_oneshot(bool enable = true);
+    SkllNetwork& set_exclusive(bool enable = true);
+    
+    // Getters
+    std::string get_name() const;
+    int         get_epfd() const;
+    int         get_timeout() const;
+    int         get_queue() const;
+    uint32_t    get_events() const;
+    int         count_protocols() const;
+    
+    void add_event(int fd);
+    void destroy_event(int fd);
 
-	// ================================
-	// Public funcs
-	// ================================
-	public:
-		~SkllNetwork();
-		SkllNetwork(const std::string &port);
-		SkllNetwork(const SkllNetwork& other);
-		SkllNetwork&	operator=(const SkllNetwork& other);
-
-		int		run();
-		void	stop();
-		void	clean();
-		void	handle();
-		void	send();
-		
-	// ================================
-	// Private funcs
-	// ================================
-	private:
-		uint16_t 	_check_port(const std::string &port);
-		void		_update_reserved_fds(int delta);
-		int			_init_socket();
-		int			_init_limit(int max);
-		int			_init_reserved(int reserved);
-
-	// ================================
-	// Get / Set
-	// ================================
-	public:
-		SkllNetwork	&set_port(const std::string& port);
-		SkllNetwork	&set_address(const std::string& address);
-		SkllNetwork	&set_max_clients(int max);
-		SkllNetwork	&set_reserved_fds(int reserved);
-		SkllNetwork	&set_timeout(int seconds);
-		SkllNetwork	&set_queue(int backlog);
-		SkllNetwork	&set_protocol(const std::string &crlf, bool binary, int protocol, int buffer_size = 512);
-
-		std::string &get_address();
-		uint16_t	&get_port();
-		int			&get_max_client();
-		int			&get_reserved_fds();
-		int			&get_timeout();
-		int			&get_queue();
+private:
+    void _handle_listening(int fd, uint32_t events);
+    void _handle_client(int fd, uint32_t events);
+    void _accept_tcp(int listen_fd);
+    void _recv_tcp(int fd);
+    
+    std::string _get_epoll_error();
 };

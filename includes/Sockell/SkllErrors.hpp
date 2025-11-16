@@ -11,14 +11,39 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <Sockell/SkllErrors.hpp>
+#include <exception>
+#include <string>
 
-class SkllErrors
-{
-private:
+class SkllException : public std::exception {
+protected:
+    std::string _msg;
 public:
-	SkllErrors();
-	~SkllErrors();
+    SkllException(const std::string& msg);
+    virtual ~SkllException() throw();
+    virtual const char* what() const throw();
 };
 
+class SkllErrorSocket : public SkllException {
+public:
+    SkllErrorSocket(const std::string& msg);
+};
 
+class SkllErrorBind : public SkllException {
+public:
+    SkllErrorBind(const std::string& msg);
+};
+
+class SkllErrorListen : public SkllException {
+public:
+    SkllErrorListen(const std::string& msg);
+};
+
+class SkllErrorEpoll : public SkllException {
+public:
+    SkllErrorEpoll(const std::string& msg);
+};
+
+class SkllErrorFull : public SkllException {
+public:
+    SkllErrorFull(const std::string& msg);
+};

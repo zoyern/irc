@@ -11,84 +11,39 @@
 /* ************************************************************************** */
 
 #pragma once
-
-#include <Sockell.hpp>
-#include <Sockell/SkllErrors.hpp>
-#include <Sockell/SkllHook.hpp>
 #include <Sockell/SkllNetwork.hpp>
-#include <Sockell/SkllConsole.hpp>
-#include <Sockell/SkllClient.hpp>
 #include <Sockell/SkllChannel.hpp>
+#include <sys/resource.h>
+#include <map>
+#include <string>
 
-class SkllErrors;
-class SkllHook;
 class SkllNetwork;
-class SkllConsole;
-class SkllClient;
-class SkllChannel;
 
-#define SKLL_NAME		"irc"
-#define SKLL_MSG		"Welcome to the IRC SkllServer!"
-
-// ================================
-// Sockell Server Class
-// ================================
 class SkllServer {
-	// ================================
-	// Public vars
-	// ================================
-	public:
-		SkllErrors		errors;
-		SkllNetwork		network;
-		SkllHook		hooks;
-		SkllConsole		&console;
-	// ================================
-	// Private vars
-	// ================================
-	private:
-		int 		_fd;
-		bool 		_running;
+private:
+    int  _clients_max;
+    int  _reserved_fd;
+    bool _running;
+    
+    std::map<std::string, SkllNetwork> _networks_owned;
+    std::map<std::string, SkllChannel> _channels_owned;
 
-		std::string	_password;
-		std::string	_name;
-		std::string	_connexion_msg;
-		int			_max_client;
+public:
+    SkllServer(int max_clients, int reserved_fd);
+    ~SkllServer();
+    
+    int  run();
+    void stop();
+    
+    SkllNetwork& network(const std::string& name, int timeout, int queue);
+    SkllChannel& channel(const std::string& name, bool is_default = false);
+    
+    std::string print_networks() const;
+    void update_fd_limits();
 
-		SkllChannel							*_default_channel;
-		std::map<std::string, SkllChannel*>	_channels;
-		std::map<int, SkllClient*>			_clients;
-
-	// ================================
-	// Public funcs
-	// ================================
-	public:
-	    ~SkllServer();
-		SkllServer(const std::string &port, const std::string &password = "", const std::string &name = "", const std::string &msg = "");
-		SkllServer(const SkllServer& other);
-		SkllServer&	operator=(const SkllServer& other);
-
-		int		run();
-		void	stop();
-		void	clean();
-
-		SkllChannel& channel(const std::string &name, bool is_default = false);
-	// ================================
-	// Private funcs
-	// ================================
-	private:
-	// ================================
-	// Get / Set
-	// ================================
-	public:
-		SkllServer	&set_name(const std::string& name);
-		SkllServer	&set_password(const std::string& pass);
-		SkllServer	&set_connexion_msg(const std::string &msg);
-		SkllServer	&set_client();
-		SkllServer	&set_Channel();
-
-		std::string	&get_name();
-		std::string	&get_password();
-		std::string &get_connexion_msg();
-		SkllClient	&get_client();
-		SkllChannel	&get_Channel();
+private:
+    int _count_listening_sockets() const;
+    
+    SkllServer(const SkllServer&);
+    SkllServer& operator=(const SkllServer&);
 };

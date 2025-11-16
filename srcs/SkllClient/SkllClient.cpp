@@ -12,5 +12,5 @@
 
 #include <Sockell/SkllClient.hpp>
 
+SkllClient::SkllClient() : fd(-1), buffer("") {}
 SkllClient::~SkllClient() {}
-SkllClient::SkllClient() {}

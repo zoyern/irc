@@ -12,68 +12,247 @@
 
 #include <Sockell/SkllNetwork.hpp>
 
-SkllNetwork::~SkllNetwork() {}
-SkllNetwork::SkllNetwork(const std::string &port)
-	: errors(SkllErrors())
-	, hooks(SkllHook())
-	, console(SkllConsole::instance())
-    , _epfd(0)
-	, _max_clients(SKLL_MAX_CLIENTS)
-	, _reserved_fds(SKLL_RESERVED_FD)
-	, _timeout(SKLL_TIMEOUT)
-	, _queue(SKLL_QUEUE)
-	, _running(false)
-	, _port(_check_port(port))
-	, _address(SKLL_ADDRESS)
+SkllNetwork::SkllNetwork()
+    : _name(""), _epfd(-1), _timeout(100), _queue(128)
+    , _epoll_events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
 {
-    console.log(INFO | WARNING, "SkllNetwork") << ":[ " << get_address() << " ] Initialized on port : [ " << get_address() << ":" << get_port() << " ]";
-    console.log() << ":[max clients : " << get_max_client() << " ]";
+    _epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
+    _events.resize(_queue);
 }
 
-SkllNetwork::SkllNetwork(const SkllNetwork& other) : console(other.console) { *this = other; }
-
-SkllNetwork&	SkllNetwork::operator=(const SkllNetwork& other) {
-	if (this == &other) return (*this);
-	return (
-		_epfd = other._epfd,
-		_max_clients = other._max_clients,
-		_reserved_fds = other._reserved_fds,
-		_timeout = other._timeout,
-		_queue = other._queue,
-		_running = other._running,
-		_port = other._port,
-		_address = other._address,
-		*this);
+SkllNetwork::SkllNetwork(const std::string& name, int timeout, int queue)
+    : _name(name), _epfd(-1), _timeout(timeout), _queue(queue)
+    , _epoll_events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
+{
+    _epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
+    _events.resize(_queue);
 }
 
-int		SkllNetwork::run() {
-	console.info("SkllNetwork") << "Listening on " << get_address() << ":" << get_port();
-
-	return (0);
-}
-void	SkllNetwork::stop() { _running = false; }
-void	SkllNetwork::clean() {
-	if (_epfd >= 0) { close(_epfd); _epfd = -1; }
-	console.info("SkllNetwork") << "SkllNetwork cleaned up.";
+SkllNetwork::~SkllNetwork() {
+    if (_epfd >= 0) close(_epfd);
 }
 
-// ================================
-// Setters
-// ================================
-SkllNetwork	&SkllNetwork::set_address(const std::string &address) { _address = address; return (*this); }
-SkllNetwork	&SkllNetwork::set_port(const std::string& port) { _port = _check_port(port); return (*this); }
-SkllNetwork	&SkllNetwork::set_max_clients(int max) { _max_clients = _init_limit(max); return (*this); }
-SkllNetwork	&SkllNetwork::set_reserved_fds(int reserved) { _reserved_fds = _init_reserved(reserved); _init_limit(_max_clients - _reserved_fds); return (*this); }
-SkllNetwork	&SkllNetwork::set_timeout(int seconds) { _timeout = seconds; return (*this); }
-SkllNetwork	&SkllNetwork::set_queue(int backlog) { _queue = backlog; return (*this); }
-SkllNetwork	&SkllNetwork::set_protocol(const std::string &crlf, bool binary, int protocol, int buffer_size) { (void)crlf;(void)buffer_size;(void)binary;(void)protocol; return (*this);}
+SkllNetwork::SkllNetwork(const SkllNetwork& other)
+    : _name(other._name)
+    , _epfd(-1)
+    , _timeout(other._timeout)
+    , _queue(other._queue)
+    , _epoll_events(other._epoll_events)
+    , _server(NULL)
+{
+    // Recrée epoll
+    _epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
+    _events.resize(_queue);
+}
 
-// ================================
-// Getters
-// ================================
-std::string &SkllNetwork::get_address() { return (_address);}
-uint16_t	&SkllNetwork::get_port() { return (_port);}
-int			&SkllNetwork::get_max_client() { return (_max_clients);}
-int			&SkllNetwork::get_reserved_fds() { return (_reserved_fds);}
-int			&SkllNetwork::get_timeout() { return (_timeout);}
-int			&SkllNetwork::get_queue() { return (_queue);}
+SkllNetwork& SkllNetwork::operator=(const SkllNetwork& other) {
+    if (this != &other) {
+        _name = other._name;
+        _timeout = other._timeout;
+        _queue = other._queue;
+        _epoll_events = other._epoll_events;
+        _events.resize(_queue);
+    }
+    return *this;
+}
+
+void SkllNetwork::set_server(SkllServer* srv) {
+    _server = srv;
+}
+
+SkllProtocol& SkllNetwork::listen(const std::string& name, const std::string& addr, int port, int opts) {
+    _protocols_owned[name] = SkllProtocol();
+    _protocols_owned[name].create(name, addr, port, opts);
+    return _protocols_owned[name];
+}
+
+SkllProtocol& SkllNetwork::listen(SkllProtocol* proto) {
+    if (!proto) throw SkllException("NULL protocol");
+    _protocols_owned[proto->get_name()] = *proto;
+    return _protocols_owned[proto->get_name()];
+}
+
+SkllNetwork& SkllNetwork::on(SkllEvent event, SkllCallback callback, void* data) {
+    hook.on(event, callback, data);
+    return *this;
+}
+
+void SkllNetwork::run() {
+    for (std::map<std::string, SkllProtocol>::iterator it = _protocols_owned.begin();
+         it != _protocols_owned.end(); ++it) {
+        it->second.run();
+        _fd_to_protocol[it->second.get_fd()] = &it->second;
+        add_event(it->second.get_fd());
+    }
+    
+    hook.trigger(ON_START);
+}
+
+void SkllNetwork::update() {
+    hook.trigger(ON_UPDATE);
+    
+    int n = epoll_wait(_epfd, &_events[0], _queue, _timeout);
+    if (n < 0) {
+        if (errno == EINTR) return;
+        hook.trigger(ON_ERROR);
+        return;
+    }
+    if (n == 0) {
+        hook.trigger(ON_TIMEOUT);
+        return;
+    }
+    
+    for (int i = 0; i < n; i++) {
+        int fd = _events[i].data.fd;
+        uint32_t events = _events[i].events;
+        
+        if (events & EPOLLERR) {
+            hook.trigger(ON_ERROR);
+            destroy_event(fd);
+            close(fd);
+            continue;
+        }
+        
+        if (events & (EPOLLHUP | EPOLLRDHUP)) {
+            hook.trigger(ON_DISCONNECT);
+            destroy_event(fd);
+            close(fd);
+            continue;
+        }
+        
+        if (_fd_to_protocol.find(fd) != _fd_to_protocol.end()) {
+            _handle_listening(fd, events);
+        } else {
+            _handle_client(fd, events);
+        }
+    }
+}
+
+void SkllNetwork::_handle_listening(int fd, uint32_t events) {
+    if (events & EPOLLIN) {
+        _accept_tcp(fd);
+    }
+}
+
+void SkllNetwork::_handle_client(int fd, uint32_t events) {
+    if (events & EPOLLIN) {
+        _recv_tcp(fd);
+    }
+}
+
+void SkllNetwork::_accept_tcp(int listen_fd) {
+    while (true) {
+        struct sockaddr_storage addr;
+        socklen_t len = sizeof(addr);
+        
+        int client_fd = accept(listen_fd, (struct sockaddr*)&addr, &len);
+        if (client_fd < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+            return;
+        }
+        
+        fcntl(client_fd, F_SETFL, O_NONBLOCK);
+        add_event(client_fd);
+        
+        hook.trigger(ON_CONNECT);
+        std::cout << "[+] Client connected: fd=" << client_fd << std::endl;
+    }
+}
+
+void SkllNetwork::_recv_tcp(int fd) {
+    char buffer[4096];
+    std::string accumulated;
+    
+    while (true) {
+        ssize_t n = recv(fd, buffer, sizeof(buffer) - 1, 0);
+        
+        if (n > 0) {
+            buffer[n] = '\0';
+            accumulated.append(buffer, n);
+        } else if (n == 0) {
+            hook.trigger(ON_DISCONNECT);
+            destroy_event(fd);
+            close(fd);
+            return;
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+            hook.trigger(ON_ERROR);
+            destroy_event(fd);
+            close(fd);
+            return;
+        }
+    }
+    
+    if (!accumulated.empty()) {
+        hook.trigger(ON_RECV);
+        std::cout << "[>] fd=" << fd << ": " << accumulated;
+    }
+}
+
+SkllNetwork& SkllNetwork::set_timeout(int ms) {
+    _timeout = ms;
+    return *this;
+}
+
+SkllNetwork& SkllNetwork::set_queue(int size) {
+    _queue = size;
+    _events.resize(size);
+    return *this;
+}
+
+SkllNetwork& SkllNetwork::set_events(uint32_t events) {
+    _epoll_events = events;
+    return *this;
+}
+
+SkllNetwork& SkllNetwork::set_edge_triggered(bool enable) {
+    if (enable) _epoll_events |= EPOLLET;
+    else _epoll_events &= ~EPOLLET;
+    return *this;
+}
+
+SkllNetwork& SkllNetwork::set_oneshot(bool enable) {
+    if (enable) _epoll_events |= EPOLLONESHOT;
+    else _epoll_events &= ~EPOLLONESHOT;
+    return *this;
+}
+
+SkllNetwork& SkllNetwork::set_exclusive(bool enable) {
+    if (enable) _epoll_events |= EPOLLEXCLUSIVE;
+    else _epoll_events &= ~EPOLLEXCLUSIVE;
+    return *this;
+}
+
+std::string SkllNetwork::get_name() const { return _name; }
+int SkllNetwork::get_epfd() const { return _epfd; }
+int SkllNetwork::get_timeout() const { return _timeout; }
+int SkllNetwork::get_queue() const { return _queue; }
+uint32_t SkllNetwork::get_events() const { return _epoll_events; }
+int SkllNetwork::count_protocols() const { return _protocols_owned.size(); }
+
+void SkllNetwork::add_event(int fd) {
+    epoll_event ev;
+    ev.events = _epoll_events;
+    ev.data.fd = fd;
+    epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev);
+}
+
+void SkllNetwork::destroy_event(int fd) {
+    epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL);
+}
+
+std::string SkllNetwork::_get_epoll_error() {
+    std::ostringstream oss;
+    oss << "epoll_create1() failed: ";
+    switch (errno) {
+        case EINVAL: oss << "Invalid flags"; break;
+        case EMFILE: oss << "Process epoll limit reached"; break;
+        case ENFILE: oss << "System FD limit reached"; break;
+        case ENOMEM: oss << "Insufficient memory"; break;
+        default: oss << std::strerror(errno);
+    }
+    return oss.str();
+}

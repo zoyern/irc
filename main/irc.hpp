@@ -15,6 +15,8 @@
 #include <iostream>
 #include <Sockell.hpp>
 #include <Sockell/SkllServer.hpp>
+#include <Sockell/SkllNetwork.hpp>
+#include <Sockell/SkllProtocol.hpp>
 #include <Sockell/SkllHook.hpp>
 #include <Sockell/SkllNetwork.hpp>
 

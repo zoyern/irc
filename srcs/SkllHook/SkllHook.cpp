@@ -12,33 +12,28 @@
 
 #include <Sockell/SkllHook.hpp>
 
-SkllHook::SkllHook() {}
+SkllHook::SkllHook() : _lib_data(NULL) {}
 SkllHook::~SkllHook() {}
 
-SkllHook &SkllHook::on(int event_mask, skllCallback callback, void *data)
-{
-	t_skllCallData cb;
-	cb.call = callback;
-	cb.data = data;
-
-	// Parcours des bits actifs du mask
-	for (int bit = 0; bit < 32; ++bit)
-	{
-		int flag = 1 << bit;
-		if (event_mask & flag)
-			_callbacks[(e_skllevent)flag].push_back(cb);
-	}
-	return (*this);
+SkllHook& SkllHook::on(SkllEvent event, SkllCallback callback, void* user_data) {
+    _callbacks[event] = callback;
+    if (user_data) _user_data[event] = user_data;
+    return *this;
 }
 
-SkllHook &SkllHook::on(const std::string &event_mask, skllCallback callback, void *data) { (void)event_mask;(void)callback;(void)data; return( *this);}
+void SkllHook::trigger(SkllEvent event, void* lib_data) {
+    std::map<SkllEvent, SkllCallback>::iterator it = _callbacks.find(event);
+    if (it == _callbacks.end() || !it->second) return;
+    
+    SkllHookData data;
+    data.lib_data = lib_data ? lib_data : _lib_data;
+    
+    std::map<SkllEvent, void*>::iterator ud = _user_data.find(event);
+    if (ud != _user_data.end()) data.user_data = ud->second;
+    
+    it->second(&data);
+}
 
-void SkllHook::trigger(e_skllevent event)
-{
-	std::map<e_skllevent, std::vector<t_skllCallData> >::iterator it = _callbacks.find(event);
-	if (it == _callbacks.end())
-		return;
-
-	for (std::vector<t_skllCallData>::iterator cb = it->second.begin(); cb != it->second.end(); ++cb)
-		cb->call();
+void SkllHook::set_lib_data(void* data) {
+    _lib_data = data;
 }

@@ -11,12 +11,13 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <Sockell.hpp>
+#include <string>
 
 class SkllClient {
 public:
-	SkllClient();
-	~SkllClient();
-
-	int fd() { return (0);}
+    int         fd;
+    std::string buffer;
+    
+    SkllClient();
+    ~SkllClient();
 };

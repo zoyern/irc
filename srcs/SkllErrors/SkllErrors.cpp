@@ -5,12 +5,19 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/09 16:44:54 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/09 16:44:54 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/16 16:58:55 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/16 16:58:55 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <Sockell/SkllErrors.hpp>
 
-SkllErrors::~SkllErrors() {}
-SkllErrors::SkllErrors() {}
+SkllException::SkllException(const std::string& msg) : _msg(msg) {}
+SkllException::~SkllException() throw() {}
+const char* SkllException::what() const throw() { return _msg.c_str(); }
+
+SkllErrorSocket::SkllErrorSocket(const std::string& msg) : SkllException(msg) {}
+SkllErrorBind::SkllErrorBind(const std::string& msg) : SkllException(msg) {}
+SkllErrorListen::SkllErrorListen(const std::string& msg) : SkllException(msg) {}
+SkllErrorEpoll::SkllErrorEpoll(const std::string& msg) : SkllException(msg) {}
+SkllErrorFull::SkllErrorFull(const std::string& msg) : SkllException(msg) {}

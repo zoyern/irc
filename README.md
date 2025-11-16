@@ -242,3 +242,34 @@ Console
 │     - error(string)
 │     - clear()
 ```
+
+
+EVENT: Client IRC envoie "JOIN #general"
+
+Network::trigger(ON_RECV, fd, client)
+    │
+    ├─ 1. Exécute _callbacks[ON_RECV]
+    │      → on_network_recv(server, client, "irc")
+    │      → Log global tous protocoles
+    │
+    ├─ 2. Regarde hooks["irc"]
+    │      → Existe ? OUI
+    │      → Exécute hooks["irc"]->_callbacks[ON_RECV]
+    │           → on_irc_recv(server, client)
+    │           → Parse commandes IRC
+    │           → Trouve "JOIN", "NICK"...
+    │
+    │      ├─ 3. Regarde hooks["irc"]->hooks["192.168.1.42:1234"]
+    │      │      → Client a ses propres hooks ? OUI
+    │      │      → Exécute hooks["192.168.1.42:1234"]->_callbacks[ON_RECV]
+    │      │           → on_client_custom(server, client)
+    │      │           → Rate limit perso pour ce client
+    │      │           → Ecriture ou droit distinc
+    │      │
+    │      │      └─ 4. Client dans channel ? OUI (client.channel)
+    │      │             → Regarde hooks["irc"]->hooks["#general"]
+    │      │             → Exécute hooks[client.channel.name]->_callbacks[ON_RECV]
+    │      │                  → on_general_message(server, client)
+    │      │                  → Broadcast aux membres
+    │
+    └─ FIN

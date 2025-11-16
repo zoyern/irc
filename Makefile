@@ -33,26 +33,15 @@ SRCS        +=	SkllErrors/SkllErrors.cpp
 
 SRCS        +=	SkllHook/SkllHook.cpp
 
-SRCS        +=	SkllNetwork/SkllNetwork.cpp \
-				SkllNetwork/SkllNetwork_private.cpp \
-
 SRCS        +=	SkllProtocol/SkllProtocol.cpp
 
-SRCS        +=	SkllConsole/SkllConsole.cpp \
-				SkllConsole/SkllConsole_public.cpp \
-				SkllConsole/SkllConsole_private.cpp
+SRCS        +=	SkllNetwork/SkllNetwork.cpp
 
-SRCS        +=	SkllClient/SkllClient.cpp \
-				SkllClient/SkllClient_public.cpp \
-				SkllClient/SkllClient_private.cpp
+SRCS        +=	SkllClient/SkllClient.cpp
 
-SRCS        +=	SkllChannel/SkllChannel.cpp \
-				SkllChannel/SkllChannel_public.cpp \
-				SkllChannel/SkllChannel_private.cpp
+SRCS        +=	SkllChannel/SkllChannel.cpp
 
-SRCS        +=	SkllServer/SkllServer.cpp \
-				SkllServer/SkllServer_public.cpp \
-				SkllServer/SkllServer_private.cpp
+SRCS        +=	SkllServer/SkllServer.cpp
 
 
 MAIN_SRCS   = main.cpp hook_server.cpp hook_channel.cpp

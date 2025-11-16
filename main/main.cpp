@@ -12,96 +12,102 @@
 
 #include "irc.hpp"
 
-// ================================
-// Main
-// ================================
+#include <Sockell/SkllServer.hpp>
+#include <Sockell/SkllClient.hpp>
+#include <cstdlib>
+#include <iostream>
+#include <map>
+
+#define SKLL_MAX_CLIENTS  1000
+#define SKLL_RESERVED_FD  10
+#define SKLL_TIMEOUT      100
+#define SKLL_QUEUE        128
+
+std::map<int, SkllClient> clients;
+
+void on_start(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] START" << std::endl;
+}
+
+void on_update(SkllHookData* d) {
+    (void)d;
+}
+
+void on_shutdown(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] SHUTDOWN" << std::endl;
+}
+
+void on_connect(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] CONNECT" << std::endl;
+}
+
+void on_disconnect(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] DISCONNECT" << std::endl;
+}
+
+void on_error(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] ERROR" << std::endl;
+}
+
+void on_timeout(SkllHookData* d) {
+    (void)d;
+}
+
+void on_recv(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] RECV" << std::endl;
+}
+
+void on_send(SkllHookData* d) {
+    (void)d;
+    std::cout << "[HOOK] SEND" << std::endl;
+}
 
 int main(int argc, char const **argv)
 {
-    if (argc != 3) return (SkllConsole::instance().error("Usage") << "./ircserv <protocol> [port]", 1);
+    if (argc != 3) {
+        std::cout << "Usage: ./ircserv <port> <password>" << std::endl;
+        return 1;
+    }
 
     try {
-		// on connect SKLL_MSG
-		// port -> protocol
-		// password oublie
+        SkllServer server(SKLL_MAX_CLIENTS, SKLL_RESERVED_FD);
+        
+        SkllNetwork& network = server.network("network", SKLL_TIMEOUT, SKLL_QUEUE)
+            .on(ON_START, &on_start, NULL)
+            .on(ON_UPDATE, &on_update, NULL)
+            .on(ON_SHUTDOWN, &on_shutdown, NULL)
+            .on(ON_CONNECT, &on_connect, NULL)
+            .on(ON_DISCONNECT, &on_disconnect, NULL)
+            .on(ON_ERROR, &on_error, NULL)
+            .on(ON_TIMEOUT, &on_timeout, NULL)
+            .on(ON_RECV, &on_recv, NULL)
+            .on(ON_SEND, &on_send, NULL);
+        
+        network.listen("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4)
+            .set_timeout(60, 10, 3)
+            .set_crlf("\r\n")
+            .set_buffer_size(512)
+            .set_chunk_size(16);
 
-		// sockets mutiple 
-		// epoll qui est seul et qui peux géré plusieur socket
-		// reussir a séparer les option que ta avec ton genre tcp udp port adress
-		// epoll gere les events et la queue
-		// socket -> protocol tcp port fd
-		// epoll events la queue 
+        server.channel("general", true)
+            .set_password("")
+            .set_topic("Welcome to Sockell IRC!");
 
-		SkllServer srv();
-		srv.network(SKLL_QUEUE);
-		srv.hooks
-			.on(ON_START, &on_start, NULL)
-			.on(ON_UPDATE, &on_update, NULL)
-			.on(ON_SHUTDOWN, &on_shutdown, NULL)
-			.on(ON_CONNECT, &on_connect, NULL)
-			.on(ON_DISCONNECT, &on_disconnect, NULL)
-			.on(ON_ERROR, &on_error, NULL)
-			.on(ON_TIMEOUT, &on_timeout, NULL)
-			.on(ON_RECV, &on_recv, NULL)
-			.on(ON_SEND, &on_send, NULL);
-
-        // ================================
-        // Configuration générale
-        // ================================
-        srv.network
-			epoll
-			.set_address("0.0.0.0")            // Écoute sur toutes les interfaces
-			.set_max_clients(100)              // Limite clients
-			.set_reserved_fds(10)              // RéSkllServer FDs
-			.set_timeout(30)                   // Timeout en secondes
-			.set_queue(128);                    // Queue backlog
-
-		//srv.network.protocol(SKLL_IPV4, SKLL_TCP, "0.0.0.0", 6667);
-
-		/*protocol.on(SKLL_IPV4, SKLL_TCP, "0.0.0.0", 6667)
-		.set_crlf("\r\n")
-		.set_binary(false)
-		.set_size(512);
-			protocol.on(SKLL_IPV4 | SKLL_IPV6, SKLL_TCP | UDP , "0.0.0.0", 8080);
-			protocol.on(SKLL_IPV6, SKLL_UDP, "0.0.0.0", 7777);
-*/
-		// ================================
-        // Hooks
-        // ================================
-
-        // ================================
-        // Channels
-        // ================================ // re réflechir a comment le serveur utilise channel
-       /*srv.channel.hook.
-			.on(ON_START, &on_channel_start, NULL)
-			.on(ON_UPDATE, &on_channel_update, NULL)
-			.on(ON_SHUTDOWN, &on_channel_shutdown, NULL)
-			.on(ON_CONNECT, &on_channel_connect, NULL)
-			.on(ON_DISCONNECT, &on_channel_disconnect, NULL)
-			.on(ON_ERROR, &on_channel_error, NULL)
-			.on(ON_TIMEOUT, &on_channel_timeout, NULL)
-			.on(ON_RECV, &on_channel_recv, NULL)
-			.on(ON_SEND, &on_channel_send, NULL)
-			.on("KICK", &handle_kick, NULL)
-			.on("INVITE", &handle_invite, NULL)
-			.on("TOPIC", &handle_topic, NULL)
-			.on("MODE", &handle_mode, NULL);*/
-
-		srv.channel(CHANNEL_NAME, CHANNEL_DEFAULT)
-			.password("")
-			.op(CHANNEL_OPERATOR)
-			.size(CHANNEL_SIZE)
-			.invite_only(CHANNEL_INV_ONLY)
-			.restricted_topic(CHANNEL_REST_TOPIC)
-			.topic(CHANNEL_TOPIC);
-
-        // ================================
-        // Lancement du serveur
-        // ================================
-        return srv.run();
+        std::cout << "\n===== Server Ready =====" << std::endl;
+        std::cout << server.print_networks() << std::endl;
+        std::cout << "==========================" << std::endl << std::endl;
+        
+        return server.run();
     }
-    catch (std::exception &e) {
-        return (std::cerr << "Error: " << e.what() << std::endl, 1);
+    catch (std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
 
     return 0;
