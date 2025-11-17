@@ -30,7 +30,7 @@
 #include <sstream>
 #include <map>
 #include <iostream>
-
+#include <vector>
 
 #include <irc/Server/Epoll.hpp>
 #include <irc/Server.hpp>
