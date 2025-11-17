@@ -12,28 +12,52 @@
 
 #include <Sockell/SkllHook.hpp>
 
-SkllHook::SkllHook() : _lib_data(NULL) {}
-SkllHook::~SkllHook() {}
+SkllHook::SkllHook() {}
 
-SkllHook& SkllHook::on(SkllEvent event, SkllCallback callback, void* user_data) {
-    _callbacks[event] = callback;
-    if (user_data) _user_data[event] = user_data;
+SkllHook::SkllHook(const SkllHook& other)
+    : _callbacks(other._callbacks), _userdata(other._userdata) {}
+
+SkllHook& SkllHook::operator=(const SkllHook& other) {
+    if (this != &other) {
+        _callbacks = other._callbacks;
+        _userdata = other._userdata;
+    }
     return *this;
 }
 
-void SkllHook::trigger(SkllEvent event, void* lib_data) {
-    std::map<SkllEvent, SkllCallback>::iterator it = _callbacks.find(event);
-    if (it == _callbacks.end() || !it->second) return;
-    
-    SkllHookData data;
-    data.lib_data = lib_data ? lib_data : _lib_data;
-    
-    std::map<SkllEvent, void*>::iterator ud = _user_data.find(event);
-    if (ud != _user_data.end()) data.user_data = ud->second;
-    
-    it->second(&data);
+SkllHook::~SkllHook() { clear(); }
+
+SkllHook& SkllHook::on(int event, Callback callback, void* user_data) {
+    _callbacks[event] = callback;
+    if (user_data) _userdata[event] = user_data;
+    return *this;
 }
 
-void SkllHook::set_lib_data(void* data) {
-    _lib_data = data;
+void SkllHook::off(int event) {
+    _callbacks.erase(event);
+    _userdata.erase(event);
+}
+
+void SkllHook::trigger(int event, void* lib_data) {
+    std::map<int, Callback>::iterator it = _callbacks.find(event);
+    if (it == _callbacks.end() || !it->second) return;
+    
+    void* user = NULL;
+    std::map<int, void*>::iterator ud = _userdata.find(event);
+    if (ud != _userdata.end()) user = ud->second;
+    
+    it->second(lib_data, user);
+}
+
+bool SkllHook::has(int event) const {
+    return _callbacks.find(event) != _callbacks.end();
+}
+
+void SkllHook::clear() {
+    _callbacks.clear();
+    _userdata.clear();
+}
+
+size_t SkllHook::count() const {
+    return _callbacks.size();
 }

@@ -12,50 +12,27 @@
 
 #include <Sockell/SkllChannel.hpp>
 
-SkllChannel::SkllChannel() : name(""), topic(""), password("") {}
-SkllChannel::SkllChannel(const std::string& n) : name(n), topic(""), password("") {}
+SkllChannel::SkllChannel() : name(""), userdata(NULL) {}
+SkllChannel::SkllChannel(const std::string& n) : name(n), userdata(NULL) {}
 SkllChannel::~SkllChannel() {}
 
-// Constructeur copie
-SkllChannel::SkllChannel(const SkllChannel& other)
-    : name(other.name), topic(other.topic), password(other.password)
-{}
-
-SkllChannel& SkllChannel::operator=(const SkllChannel& other) {
-    if (this != &other) {
-        name = other.name;
-        topic = other.topic;
-        password = other.password;
-    }
-    return *this;
+void SkllChannel::add_client(const std::string& id) {
+    client_ids.insert(id);
 }
 
-SkllChannel& SkllChannel::set_topic(const std::string& t) {
-    topic = t;
-    return *this;
+void SkllChannel::remove_client(const std::string& id) {
+    client_ids.erase(id);
 }
 
-SkllChannel& SkllChannel::set_password(const std::string& p) {
-    password = p;
-    return *this;
+bool SkllChannel::has_client(const std::string& id) const {
+    return client_ids.find(id) != client_ids.end();
 }
 
-SkllChannel& SkllChannel::op(int flags) {
-    (void)flags;
-    return *this;
+size_t SkllChannel::size() const {
+    return client_ids.size();
 }
 
-SkllChannel& SkllChannel::size(int max_users) {
-    (void)max_users;
-    return *this;
-}
-
-SkllChannel& SkllChannel::invite_only(bool enable) {
-    (void)enable;
-    return *this;
-}
-
-SkllChannel& SkllChannel::restricted_topic(bool enable) {
-    (void)enable;
+SkllChannel& SkllChannel::on(int event, SkllHook::Callback cb, void* user_data) {
+    hook.on(event, cb, user_data);
     return *this;
 }

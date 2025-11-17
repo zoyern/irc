@@ -27,11 +27,13 @@ CFLAGS      = -Wall -Wextra -Werror -g3 -std=c++98 -I$(INC_DIR)
 DEPFLAGS    = -MMD -MP
 AR          = ar rcs
 
-SRCS		= signals.cpp
+SRCS		=	SkllSignals/SkllSignals.cpp
 
 SRCS        +=	SkllErrors/SkllErrors.cpp
 
 SRCS        +=	SkllHook/SkllHook.cpp
+
+SRCS        +=	SkllMessage/SkllMessage.cpp
 
 SRCS        +=	SkllProtocol/SkllProtocol.cpp
 
@@ -44,7 +46,7 @@ SRCS        +=	SkllChannel/SkllChannel.cpp
 SRCS        +=	SkllServer/SkllServer.cpp
 
 
-MAIN_SRCS   = main.cpp hook_server.cpp hook_channel.cpp
+MAIN_SRCS   = main.cpp IRCServer.cpp
 
 SRCS_FULL   = $(addprefix $(SRC_DIR)/, $(SRCS))
 MAIN_FULL   = $(addprefix $(MAIN_DIR)/, $(MAIN_SRCS))

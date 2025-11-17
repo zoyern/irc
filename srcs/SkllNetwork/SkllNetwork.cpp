@@ -11,231 +11,221 @@
 /* ************************************************************************** */
 
 #include <Sockell/SkllNetwork.hpp>
+#include <Sockell/SkllMessage.hpp>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+#include <cerrno>
+#include <sstream>
+#include <iostream>
 
 SkllNetwork::SkllNetwork()
-    : _name(""), _epfd(-1), _timeout(100), _queue(128)
-    , _epoll_events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
+    : _epfd(-1), _timeout(100), _queue(128), _events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
 {
     _epfd = epoll_create1(EPOLL_CLOEXEC);
-    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
-    _events.resize(_queue);
+    if (_epfd < 0) throw SkllErrorEpoll(_err_epoll());
+    _ev.resize(_queue);
 }
 
-SkllNetwork::SkllNetwork(const std::string& name, int timeout, int queue)
-    : _name(name), _epfd(-1), _timeout(timeout), _queue(queue)
-    , _epoll_events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
+SkllNetwork::SkllNetwork(const std::string& n, int t, int q)
+    : _name(n), _epfd(-1), _timeout(t), _queue(q), _events(EPOLLIN | EPOLLRDHUP | EPOLLET), _server(NULL)
 {
     _epfd = epoll_create1(EPOLL_CLOEXEC);
-    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
-    _events.resize(_queue);
+    if (_epfd < 0) throw SkllErrorEpoll(_err_epoll());
+    _ev.resize(_queue);
+}
+
+SkllNetwork::SkllNetwork(const SkllNetwork& other)
+    : _name(other._name), _epfd(-1), _timeout(other._timeout), _queue(other._queue),
+      _events(other._events), _server(other._server), _protos(other._protos), _fd_proto(other._fd_proto)
+{
+    _epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (_epfd < 0) throw SkllErrorEpoll(_err_epoll());
+    _ev.resize(_queue);
+}
+
+SkllNetwork& SkllNetwork::operator=(const SkllNetwork& other) {
+    if (this != &other) {
+        if (_epfd >= 0) close(_epfd);
+        _name = other._name;
+        _timeout = other._timeout;
+        _queue = other._queue;
+        _events = other._events;
+        _server = other._server;
+        _protos = other._protos;
+        _fd_proto = other._fd_proto;
+        
+        _epfd = epoll_create1(EPOLL_CLOEXEC);
+        if (_epfd < 0) throw SkllErrorEpoll(_err_epoll());
+        _ev.resize(_queue);
+    }
+    return *this;
 }
 
 SkllNetwork::~SkllNetwork() {
     if (_epfd >= 0) close(_epfd);
 }
 
-SkllNetwork::SkllNetwork(const SkllNetwork& other)
-    : _name(other._name)
-    , _epfd(-1)
-    , _timeout(other._timeout)
-    , _queue(other._queue)
-    , _epoll_events(other._epoll_events)
-    , _server(NULL)
-{
-    // Recrée epoll
-    _epfd = epoll_create1(EPOLL_CLOEXEC);
-    if (_epfd < 0) throw SkllErrorEpoll(_get_epoll_error());
-    _events.resize(_queue);
+void SkllNetwork::set_server(SkllServer* s) {
+    _server = s;
 }
 
-SkllNetwork& SkllNetwork::operator=(const SkllNetwork& other) {
-    if (this != &other) {
-        _name = other._name;
-        _timeout = other._timeout;
-        _queue = other._queue;
-        _epoll_events = other._epoll_events;
-        _events.resize(_queue);
-    }
-    return *this;
+void SkllNetwork::add_protocol(const std::string& name, SkllProtocol* p) {
+    if (!p) throw SkllException("NULL protocol");
+    _protos[name] = p;
 }
 
-void SkllNetwork::set_server(SkllServer* srv) {
-    _server = srv;
+SkllProtocol* SkllNetwork::get_protocol(const std::string& name) {
+    std::map<std::string, SkllProtocol*>::iterator it = _protos.find(name);
+    return (it != _protos.end()) ? it->second : NULL;
 }
 
-SkllProtocol& SkllNetwork::listen(const std::string& name, const std::string& addr, int port, int opts) {
-    _protocols_owned[name] = SkllProtocol();
-    _protocols_owned[name].create(name, addr, port, opts);
-    return _protocols_owned[name];
-}
-
-SkllProtocol& SkllNetwork::listen(SkllProtocol* proto) {
-    if (!proto) throw SkllException("NULL protocol");
-    _protocols_owned[proto->get_name()] = *proto;
-    return _protocols_owned[proto->get_name()];
-}
-
-SkllNetwork& SkllNetwork::on(SkllEvent event, SkllCallback callback, void* data) {
-    hook.on(event, callback, data);
+SkllNetwork& SkllNetwork::on(int event, SkllHook::Callback cb, void* user_data) {
+    hook.on(event, cb, user_data);
     return *this;
 }
 
 void SkllNetwork::run() {
-    for (std::map<std::string, SkllProtocol>::iterator it = _protocols_owned.begin();
-         it != _protocols_owned.end(); ++it) {
-        it->second.run();
-        _fd_to_protocol[it->second.get_fd()] = &it->second;
-        add_event(it->second.get_fd());
+    for (std::map<std::string, SkllProtocol*>::iterator it = _protos.begin(); it != _protos.end(); ++it) {
+        it->second->run();
+        _fd_proto[it->second->get_fd()] = it->second;
+        add_event(it->second->get_fd());
     }
     
-    hook.trigger(ON_START);
+    hook.trigger(ON_START, NULL);
 }
 
 void SkllNetwork::update() {
-    hook.trigger(ON_UPDATE);
+    hook.trigger(ON_UPDATE, NULL);
     
-    int n = epoll_wait(_epfd, &_events[0], _queue, _timeout);
+    int n = epoll_wait(_epfd, &_ev[0], _queue, _timeout);
     if (n < 0) {
         if (errno == EINTR) return;
-        hook.trigger(ON_ERROR);
+        hook.trigger(ON_ERROR, NULL);
         return;
     }
     if (n == 0) {
-        hook.trigger(ON_TIMEOUT);
+        hook.trigger(ON_TIMEOUT, NULL);
         return;
     }
     
-    for (int i = 0; i < n; i++) {
-        int fd = _events[i].data.fd;
-        uint32_t events = _events[i].events;
+    for (int i = 0; i < n; ++i) {
+        int fd = _ev[i].data.fd;
+        uint32_t ev = _ev[i].events;
         
-        if (events & EPOLLERR) {
-            hook.trigger(ON_ERROR);
+        if (ev & EPOLLERR) {
+            hook.trigger(ON_ERROR, NULL);
             destroy_event(fd);
             close(fd);
             continue;
         }
         
-        if (events & (EPOLLHUP | EPOLLRDHUP)) {
-            hook.trigger(ON_DISCONNECT);
+        if (ev & (EPOLLHUP | EPOLLRDHUP)) {
+            for (std::map<std::string, SkllProtocol*>::iterator pit = _protos.begin(); pit != _protos.end(); ++pit) {
+                SkllClient* cli = pit->second->get_client(fd);
+                if (cli) {
+                    pit->second->hook.trigger(ON_DISCONNECT, NULL);
+                    pit->second->remove_client(fd);
+                    break;
+                }
+            }
+            hook.trigger(ON_DISCONNECT, NULL);
             destroy_event(fd);
             close(fd);
             continue;
         }
         
-        if (_fd_to_protocol.find(fd) != _fd_to_protocol.end()) {
-            _handle_listening(fd, events);
-        } else {
-            _handle_client(fd, events);
-        }
+        if (_fd_proto.find(fd) != _fd_proto.end()) _handle_listen(fd, ev);
+        else _handle_client(fd, ev);
     }
 }
 
-void SkllNetwork::_handle_listening(int fd, uint32_t events) {
-    if (events & EPOLLIN) {
-        _accept_tcp(fd);
-    }
+void SkllNetwork::_handle_listen(int fd, uint32_t ev) {
+    if (ev & EPOLLIN) _accept(fd);
 }
 
-void SkllNetwork::_handle_client(int fd, uint32_t events) {
-    if (events & EPOLLIN) {
-        _recv_tcp(fd);
-    }
+void SkllNetwork::_handle_client(int fd, uint32_t ev) {
+    if (ev & EPOLLIN) _recv(fd);
 }
 
-void SkllNetwork::_accept_tcp(int listen_fd) {
+void SkllNetwork::_accept(int lfd) {
+    SkllProtocol* proto = _fd_proto[lfd];
+    
     while (true) {
         struct sockaddr_storage addr;
         socklen_t len = sizeof(addr);
         
-        int client_fd = accept(listen_fd, (struct sockaddr*)&addr, &len);
-        if (client_fd < 0) {
+        int cfd = accept(lfd, (struct sockaddr*)&addr, &len);
+        if (cfd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) break;
             return;
         }
         
-        fcntl(client_fd, F_SETFL, O_NONBLOCK);
-        add_event(client_fd);
-        
-        hook.trigger(ON_CONNECT);
-        std::cout << "[+] Client connected: fd=" << client_fd << std::endl;
+        fcntl(cfd, F_SETFL, O_NONBLOCK);
+        add_event(cfd);
+
+        hook.trigger(ON_CONNECT, &cfd);
+        proto->hook.trigger(ON_CONNECT, &cfd);
     }
 }
 
-void SkllNetwork::_recv_tcp(int fd) {
-    char buffer[4096];
-    std::string accumulated;
+void SkllNetwork::_recv(int fd) {
+    SkllProtocol* proto = NULL;
+    SkllClient* cli = NULL;
+    
+    for (std::map<std::string, SkllProtocol*>::iterator it = _protos.begin(); it != _protos.end(); ++it) {
+        cli = it->second->get_client(fd);
+        if (cli) {
+            proto = it->second;
+            break;
+        }
+    }
+    
+    if (!cli) return;
+    
+    unsigned char buf[4096];
     
     while (true) {
-        ssize_t n = recv(fd, buffer, sizeof(buffer) - 1, 0);
+        ssize_t n = recv(fd, buf, sizeof(buf), 0);
         
         if (n > 0) {
-            buffer[n] = '\0';
-            accumulated.append(buffer, n);
+            cli->buffer.insert(cli->buffer.end(), buf, buf + n);
         } else if (n == 0) {
-            hook.trigger(ON_DISCONNECT);
+            hook.trigger(ON_DISCONNECT, NULL);
+            if (proto) {
+                proto->hook.trigger(ON_DISCONNECT, NULL);
+                proto->remove_client(fd);
+            }
             destroy_event(fd);
             close(fd);
             return;
         } else {
             if (errno == EAGAIN || errno == EWOULDBLOCK) break;
-            hook.trigger(ON_ERROR);
+            hook.trigger(ON_ERROR, NULL);
+            if (proto) proto->remove_client(fd);
             destroy_event(fd);
             close(fd);
             return;
         }
     }
     
-    if (!accumulated.empty()) {
-        hook.trigger(ON_RECV);
-        std::cout << "[>] fd=" << fd << ": " << accumulated;
+    if (!cli->buffer.empty()) {
+        hook.trigger(ON_RECV, NULL);
+        if (proto) proto->hook.trigger(ON_RECV, NULL);
+        cli->hook.trigger(ON_RECV, NULL);
     }
 }
 
-SkllNetwork& SkllNetwork::set_timeout(int ms) {
-    _timeout = ms;
-    return *this;
+void SkllNetwork::broadcast(const char* d, size_t l) {
+    for (std::map<std::string, SkllProtocol*>::iterator it = _protos.begin(); it != _protos.end(); ++it)
+        it->second->broadcast(d, l);
 }
-
-SkllNetwork& SkllNetwork::set_queue(int size) {
-    _queue = size;
-    _events.resize(size);
-    return *this;
-}
-
-SkllNetwork& SkllNetwork::set_events(uint32_t events) {
-    _epoll_events = events;
-    return *this;
-}
-
-SkllNetwork& SkllNetwork::set_edge_triggered(bool enable) {
-    if (enable) _epoll_events |= EPOLLET;
-    else _epoll_events &= ~EPOLLET;
-    return *this;
-}
-
-SkllNetwork& SkllNetwork::set_oneshot(bool enable) {
-    if (enable) _epoll_events |= EPOLLONESHOT;
-    else _epoll_events &= ~EPOLLONESHOT;
-    return *this;
-}
-
-SkllNetwork& SkllNetwork::set_exclusive(bool enable) {
-    if (enable) _epoll_events |= EPOLLEXCLUSIVE;
-    else _epoll_events &= ~EPOLLEXCLUSIVE;
-    return *this;
-}
-
-std::string SkllNetwork::get_name() const { return _name; }
-int SkllNetwork::get_epfd() const { return _epfd; }
-int SkllNetwork::get_timeout() const { return _timeout; }
-int SkllNetwork::get_queue() const { return _queue; }
-uint32_t SkllNetwork::get_events() const { return _epoll_events; }
-int SkllNetwork::count_protocols() const { return _protocols_owned.size(); }
 
 void SkllNetwork::add_event(int fd) {
     epoll_event ev;
-    ev.events = _epoll_events;
+    ev.events = _events;
     ev.data.fd = fd;
     epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev);
 }
@@ -244,15 +234,41 @@ void SkllNetwork::destroy_event(int fd) {
     epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL);
 }
 
-std::string SkllNetwork::_get_epoll_error() {
-    std::ostringstream oss;
-    oss << "epoll_create1() failed: ";
-    switch (errno) {
-        case EINVAL: oss << "Invalid flags"; break;
-        case EMFILE: oss << "Process epoll limit reached"; break;
-        case ENFILE: oss << "System FD limit reached"; break;
-        case ENOMEM: oss << "Insufficient memory"; break;
-        default: oss << std::strerror(errno);
+std::string SkllNetwork::get_name() const { return _name; }
+int SkllNetwork::get_epfd() const { return _epfd; }
+size_t SkllNetwork::protocol_count() const { return _protos.size(); }
+
+std::string SkllNetwork::print_protocols() const {
+    std::ostringstream o;
+    
+    for (std::map<std::string, SkllProtocol*>::const_iterator it = _protos.begin(); it != _protos.end(); ++it) {
+        SkllProtocol* p = it->second;
+        
+        o << "  [" << p->get_name() << "] ";
+        o << p->get_address() << ":" << p->get_port() << " (";
+        
+        if (p->is_tcp()) o << "TCP";
+        else o << "UDP";
+        
+        o << "/";
+        
+        if (p->get_address().find(':') != std::string::npos) o << "IPv6";
+        else o << "IPv4";
+        
+        o << ")\n";
     }
-    return oss.str();
+    
+    return o.str();
+}
+
+std::string SkllNetwork::_err_epoll() {
+    std::ostringstream o;
+    o << "epoll_create1(): ";
+    switch (errno) {
+        case EINVAL: o << "Invalid flags"; break;
+        case EMFILE: o << "Process limit"; break;
+        case ENFILE: o << "System limit"; break;
+        default: o << std::strerror(errno);
+    }
+    return o.str();
 }

@@ -15,35 +15,30 @@
 #include <string>
 
 class SkllException : public std::exception {
-protected:
-    std::string _msg;
-public:
-    SkllException(const std::string& msg);
-    virtual ~SkllException() throw();
-    virtual const char* what() const throw();
+	protected:
+		std::string	_msg;
+	public:
+		SkllException(const std::string &msg);
+		virtual ~SkllException() throw();
+		virtual const char *what() const throw();
 };
 
 class SkllErrorSocket : public SkllException {
 public:
-    SkllErrorSocket(const std::string& msg);
+	SkllErrorSocket(const std::string &m);
 };
 
 class SkllErrorBind : public SkllException {
 public:
-    SkllErrorBind(const std::string& msg);
+	SkllErrorBind(const std::string &m);
 };
 
 class SkllErrorListen : public SkllException {
 public:
-    SkllErrorListen(const std::string& msg);
+	SkllErrorListen(const std::string &m);
 };
 
 class SkllErrorEpoll : public SkllException {
 public:
-    SkllErrorEpoll(const std::string& msg);
-};
-
-class SkllErrorFull : public SkllException {
-public:
-    SkllErrorFull(const std::string& msg);
+	SkllErrorEpoll(const std::string &m);
 };

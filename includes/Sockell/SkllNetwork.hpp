@@ -12,83 +12,53 @@
 
 #pragma once
 #include <Sockell/SkllProtocol.hpp>
-#include <Sockell/SkllHook.hpp>
-#include <Sockell/SkllServer.hpp>
 #include <sys/epoll.h>
 #include <vector>
 #include <map>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstring>
-#include <cerrno>
-#include <sstream>
-#include <iostream>
 
 class SkllServer;
 
 class SkllNetwork {
-private:
-    std::string _name;
-    int  _epfd;
-    int  _timeout;
-    int  _queue;
-    uint32_t _epoll_events;
-    
-    SkllServer* _server;
-    
-    std::vector<epoll_event> _events;
-    std::map<std::string, SkllProtocol>  _protocols_owned;
-    std::map<int, SkllProtocol*>         _fd_to_protocol;
+	private:
+		std::string	_name;
+		int			_epfd;
+		int			_timeout;
+		int			_queue;
+		uint32_t	_events;
+		SkllServer	*_server;
 
-public:
-    SkllHook hook;
-    
-    SkllNetwork();
-    SkllNetwork(const std::string& name, int timeout, int queue);
-    ~SkllNetwork();
-    
-    // ═══════════════════════════════════════════════════
-    // COPIE (PUBLIC pour std::map)
-    // ═══════════════════════════════════════════════════
-    SkllNetwork(const SkllNetwork& other);
-    SkllNetwork& operator=(const SkllNetwork& other);
-    
-    void run();
-    void update();
-    void set_server(SkllServer* srv);
-    
-    SkllProtocol& listen(const std::string& name, const std::string& addr, int port, int opts);
-    SkllProtocol& listen(SkllProtocol* proto);
-    
-    SkllNetwork& on(SkllEvent event, SkllCallback callback, void* data = NULL);
-    
-    // Setters
-    SkllNetwork& set_timeout(int milliseconds);
-    SkllNetwork& set_queue(int size);
-    SkllNetwork& set_events(uint32_t events);
-    SkllNetwork& set_edge_triggered(bool enable = true);
-    SkllNetwork& set_oneshot(bool enable = true);
-    SkllNetwork& set_exclusive(bool enable = true);
-    
-    // Getters
-    std::string get_name() const;
-    int         get_epfd() const;
-    int         get_timeout() const;
-    int         get_queue() const;
-    uint32_t    get_events() const;
-    int         count_protocols() const;
-    
-    void add_event(int fd);
-    void destroy_event(int fd);
+		std::vector<epoll_event>				_ev;
+		std::map<std::string, SkllProtocol*>	_protos;
+		std::map<int, SkllProtocol*>			_fd_proto;
+	public:
+		SkllHook	hook;
 
-private:
-    void _handle_listening(int fd, uint32_t events);
-    void _handle_client(int fd, uint32_t events);
-    void _accept_tcp(int listen_fd);
-    void _recv_tcp(int fd);
-    
-    std::string _get_epoll_error();
+		~SkllNetwork();
+		SkllNetwork();
+		SkllNetwork(const std::string &name, int timeout, int queue);
+		SkllNetwork(const SkllNetwork &other);
+		SkllNetwork	&operator=(const SkllNetwork &other);
+		
+		void			run();
+		void			update();
+		void			set_server(SkllServer *s);
+		void			add_event(int fd);
+		void			destroy_event(int fd);
+		void			add_protocol(const std::string &name, SkllProtocol *p);
+		void			broadcast(const char *data, size_t len);
+		SkllNetwork		&on(int event, SkllHook::Callback cb, void *user_data = NULL);
+		
+		SkllProtocol	*get_protocol(const std::string &name);
+
+		int				get_epfd() const;
+		size_t			protocol_count() const;
+		std::string		get_name() const;
+		std::string		print_protocols() const;
+
+	private:
+		void		_handle_listen(int fd, uint32_t ev);
+		void		_handle_client(int fd, uint32_t ev);
+		void		_accept(int fd);
+		void		_recv(int fd);
+		std::string	_err_epoll();
 };

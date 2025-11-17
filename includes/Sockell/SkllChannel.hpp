@@ -13,27 +13,23 @@
 #pragma once
 #include <Sockell/SkllHook.hpp>
 #include <string>
-#include <cstddef>
+#include <set>
 
 class SkllChannel {
-public:
-    SkllHook    hook;
-    std::string name;
-    std::string topic;
-    std::string password;
-    
-    SkllChannel();
-    SkllChannel(const std::string& channel_name);
-    ~SkllChannel();
-    
-    // Copie (public pour std::map)
-    SkllChannel(const SkllChannel& other);
-    SkllChannel& operator=(const SkllChannel& other);
-    
-    SkllChannel& set_topic(const std::string& t);
-    SkllChannel& set_password(const std::string& p);
-    SkllChannel& op(int flags);
-    SkllChannel& size(int max_users);
-    SkllChannel& invite_only(bool enable);
-    SkllChannel& restricted_topic(bool enable);
+	public:
+		SkllHook				hook;
+		std::string				name;
+		std::set<std::string>	client_ids;
+		void					*userdata;
+
+		~SkllChannel();
+		SkllChannel();
+		SkllChannel(const std::string &n);
+
+		SkllChannel	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
+		void		add_client(const std::string &id);
+		void		remove_client(const std::string &id);
+
+		bool		has_client(const std::string &id) const;
+		size_t		size() const;
 };

@@ -11,24 +11,31 @@
 /* ************************************************************************** */
 
 #pragma once
-
-#include <sys/socket.h>
-#include <sys/epoll.h>
-#include <sys/resource.h>
-#include <netinet/in.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <sys/time.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstring>
-#include <cstdlib>
-#include <string>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <map>
 #include <vector>
-#include <iostream>
+#include <stdint.h>
 
+typedef std::vector<unsigned char> SkllBuffer;
+
+enum SkllProtocolType {
+    SKLL_TCP  = 1 << 0,
+    SKLL_UDP  = 1 << 1,
+    SKLL_IPV4 = 1 << 2,
+    SKLL_IPV6 = 1 << 3
+};
+
+enum SkllEvent {
+    ON_START      = 1 << 0,
+    ON_UPDATE     = 1 << 1,
+    ON_SHUTDOWN   = 1 << 2,
+    ON_CONNECT    = 1 << 3,
+    ON_DISCONNECT = 1 << 4,
+    ON_ERROR      = 1 << 5,
+    ON_TIMEOUT    = 1 << 6,
+    ON_RECV       = 1 << 7,
+    ON_SEND       = 1 << 8
+};
+
+struct SkllHookData {
+    void* lib_data;
+    void* user_data;
+};

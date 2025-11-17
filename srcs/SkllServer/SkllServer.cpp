@@ -12,54 +12,92 @@
 
 #include <Sockell/SkllServer.hpp>
 #include <iostream>
-#include <sstream>
-#include <Sockell/SkllServer.hpp>
-#include <iostream>
-#include <sstream>
 
-SkllServer::SkllServer(int max_clients, int reserved_fd)
-    : _clients_max(max_clients), _reserved_fd(reserved_fd), _running(false)
+SkllServer::SkllServer(int max_cli, int res)
+    : _max_clients(max_cli), _reserved(res), _running(false)
 {
+    SkllSignals::setup();
     update_fd_limits();
 }
 
-SkllServer::~SkllServer() {}
-
-// ═══════════════════════════════════════════════════
-// FIX : Crée objet vide puis configure
-// ═══════════════════════════════════════════════════
-SkllNetwork& SkllServer::network(const std::string& name, int timeout, int queue) {
-    _networks_owned[name] = SkllNetwork(name, timeout, queue);
-    _networks_owned[name].set_server(this);
+SkllServer::SkllServer(const SkllServer& other)
+    : _max_clients(other._max_clients), _reserved(other._reserved),
+      _running(false), _nets(other._nets), _chans(other._chans)
+{
+    SkllSignals::setup();
     update_fd_limits();
-    return _networks_owned[name];
 }
 
-SkllChannel& SkllServer::channel(const std::string& name, bool is_default) {
-    (void)is_default;
-    _channels_owned[name] = SkllChannel(name);
-    return _channels_owned[name];
+SkllServer& SkllServer::operator=(const SkllServer& other) {
+    if (this != &other) {
+        _max_clients = other._max_clients;
+        _reserved = other._reserved;
+        _running = false;
+        _nets = other._nets;
+        _chans = other._chans;
+        update_fd_limits();
+    }
+    return *this;
+}
+
+SkllServer::~SkllServer() {
+    SkllSignals::cleanup();
+}
+
+void SkllServer::add_network(const std::string& n, SkllNetwork* net) {
+    if (!net) throw SkllException("NULL network");
+    _nets[n] = net;
+    net->set_server(this);
+    update_fd_limits();
+}
+
+void SkllServer::add_channel(const std::string& n, SkllChannel* ch) {
+    if (!ch) throw SkllException("NULL channel");
+    _chans[n] = ch;
+}
+
+SkllNetwork* SkllServer::get_network(const std::string& n) {
+    std::map<std::string, SkllNetwork*>::iterator it = _nets.find(n);
+    return (it != _nets.end()) ? it->second : NULL;
+}
+
+SkllChannel* SkllServer::get_channel(const std::string& n) {
+    std::map<std::string, SkllChannel*>::iterator it = _chans.find(n);
+    return (it != _chans.end()) ? it->second : NULL;
+}
+
+SkllServer& SkllServer::on(int event, SkllHook::Callback cb, void* user_data) {
+    hook.on(event, cb, user_data);
+    return *this;
 }
 
 int SkllServer::run() {
     _running = true;
     
-    for (std::map<std::string, SkllNetwork>::iterator it = _networks_owned.begin();
-         it != _networks_owned.end(); ++it) {
-        it->second.run();
+    for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it)
+        it->second->run();
+    
+    for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it)
+        it->second->add_event(SkllSignals::get_read_fd());
+    
+    std::cout << "\n===== Sockell Server =====\n";
+    for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it) {
+        std::cout << "Network: " << it->second->get_name() << "\n";
+        std::cout << it->second->print_protocols();
+    }
+    std::cout << "Max clients: " << _max_clients << "\n";
+    std::cout << "==========================\n";
+    std::cout << "✓ Started (Ctrl+C to stop)\n\n";
+    
+    while (_running && !SkllSignals::check()) {
+        for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it)
+            it->second->update();
     }
     
-    while (_running) {
-        for (std::map<std::string, SkllNetwork>::iterator it = _networks_owned.begin();
-             it != _networks_owned.end(); ++it) {
-            it->second.update();
-        }
-    }
+    std::cout << "\n✓ Server stopped\n";
     
-    for (std::map<std::string, SkllNetwork>::iterator it = _networks_owned.begin();
-         it != _networks_owned.end(); ++it) {
-        it->second.hook.trigger(ON_SHUTDOWN);
-    }
+    for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it)
+        it->second->hook.trigger(ON_SHUTDOWN, NULL);
     
     return 0;
 }
@@ -68,35 +106,26 @@ void SkllServer::stop() {
     _running = false;
 }
 
-std::string SkllServer::print_networks() const {
-    std::ostringstream oss;
-    
-    for (std::map<std::string, SkllNetwork>::const_iterator net = _networks_owned.begin();
-         net != _networks_owned.end(); ++net) {
-        oss << "\nNetwork: " << net->second.get_name() << std::endl;
-        oss << "  Protocols: " << net->second.count_protocols() << std::endl;
-    }
-    
-    return oss.str();
+void SkllServer::broadcast(const char* d, size_t l) {
+    for (std::map<std::string, SkllNetwork*>::iterator it = _nets.begin(); it != _nets.end(); ++it)
+        it->second->broadcast(d, l);
 }
 
 void SkllServer::update_fd_limits() {
     struct rlimit rl;
     if (getrlimit(RLIMIT_NOFILE, &rl) != 0) return;
     
-    int needed = 3 + _networks_owned.size() + _count_listening_sockets() + _clients_max + _reserved_fd;
+    int need = 3 + _nets.size() + 2 + _count_sockets() + _max_clients + _reserved;
     
-    if (static_cast<int>(rl.rlim_cur) < needed) {
-        rl.rlim_cur = (needed > static_cast<int>(rl.rlim_max)) ? rl.rlim_max : needed;
+    if (static_cast<int>(rl.rlim_cur) < need) {
+        rl.rlim_cur = (need > static_cast<int>(rl.rlim_max)) ? rl.rlim_max : need;
         setrlimit(RLIMIT_NOFILE, &rl);
     }
 }
 
-int SkllServer::_count_listening_sockets() const {
-    int count = 0;
-    for (std::map<std::string, SkllNetwork>::const_iterator it = _networks_owned.begin();
-         it != _networks_owned.end(); ++it) {
-        count += it->second.count_protocols();
-    }
-    return count;
+int SkllServer::_count_sockets() const {
+    int c = 0;
+    for (std::map<std::string, SkllNetwork*>::const_iterator it = _nets.begin(); it != _nets.end(); ++it)
+        c += it->second->protocol_count();
+    return c;
 }

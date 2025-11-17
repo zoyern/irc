@@ -12,5 +12,10 @@
 
 #include <Sockell/SkllClient.hpp>
 
-SkllClient::SkllClient() : fd(-1), buffer("") {}
+SkllClient::SkllClient() : fd(-1), id(""), userdata(NULL) {}
 SkllClient::~SkllClient() {}
+
+SkllClient& SkllClient::on(int event, SkllHook::Callback cb, void* user_data) {
+    hook.on(event, cb, user_data);
+    return *this;
+}

@@ -10,105 +10,57 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "irc.hpp"
-
 #include <Sockell/SkllServer.hpp>
-#include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllNetwork.hpp>
+#include <Sockell/SkllProtocol.hpp>
+#include "IRCServer.hpp"
 #include <cstdlib>
 #include <iostream>
-#include <map>
 
-#define SKLL_MAX_CLIENTS  1000
-#define SKLL_RESERVED_FD  10
-#define SKLL_TIMEOUT      100
-#define SKLL_QUEUE        128
-
-std::map<int, SkllClient> clients;
-
-void on_start(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] START" << std::endl;
+void on_connect(void* lib, void* user) {
+    if (!lib || !user) return;
+    int* fd = static_cast<int*>(lib);
+    IRCServer* irc = static_cast<IRCServer*>(user);
+    irc->on_connect(*fd);
 }
 
-void on_update(SkllHookData* d) {
-    (void)d;
+void on_recv(void* lib, void* user) {
+    (void)lib;
+    if (!user) return;
+    IRCServer* irc = static_cast<IRCServer*>(user);
+    irc->on_recv();
 }
 
-void on_shutdown(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] SHUTDOWN" << std::endl;
-}
-
-void on_connect(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] CONNECT" << std::endl;
-}
-
-void on_disconnect(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] DISCONNECT" << std::endl;
-}
-
-void on_error(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] ERROR" << std::endl;
-}
-
-void on_timeout(SkllHookData* d) {
-    (void)d;
-}
-
-void on_recv(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] RECV" << std::endl;
-}
-
-void on_send(SkllHookData* d) {
-    (void)d;
-    std::cout << "[HOOK] SEND" << std::endl;
-}
-
-int main(int argc, char const **argv)
-{
+int main(int argc, char const **argv) {
     if (argc != 3) {
-        std::cout << "Usage: ./ircserv <port> <password>" << std::endl;
+        std::cout << "Usage: ./ircserv <port> <password>\n";
         return 1;
     }
 
     try {
-        SkllServer server(SKLL_MAX_CLIENTS, SKLL_RESERVED_FD);
+        IRCServer irc(argv[2]);
         
-        SkllNetwork& network = server.network("network", SKLL_TIMEOUT, SKLL_QUEUE)
-            .on(ON_START, &on_start, NULL)
-            .on(ON_UPDATE, &on_update, NULL)
-            .on(ON_SHUTDOWN, &on_shutdown, NULL)
-            .on(ON_CONNECT, &on_connect, NULL)
-            .on(ON_DISCONNECT, &on_disconnect, NULL)
-            .on(ON_ERROR, &on_error, NULL)
-            .on(ON_TIMEOUT, &on_timeout, NULL)
-            .on(ON_RECV, &on_recv, NULL)
-            .on(ON_SEND, &on_send, NULL);
+        SkllServer server(IRC_MAX_CLIENTS, 10);
+        SkllNetwork network("irc", 100, 128);
+        SkllProtocol protocol;
         
-        network.listen("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4)
-            .set_timeout(60, 10, 3)
-            .set_crlf("\r\n")
-            .set_buffer_size(512)
-            .set_chunk_size(16);
-
-        server.channel("general", true)
-            .set_password("")
-            .set_topic("Welcome to Sockell IRC!");
-
-        std::cout << "\n===== Server Ready =====" << std::endl;
-        std::cout << server.print_networks() << std::endl;
-        std::cout << "==========================" << std::endl << std::endl;
+        // Setup protocol (0 new !)
+        protocol.create("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4);
+        protocol.set_nodelay().set_quickack();
+        
+        irc.set_protocol(&protocol);
+        
+        network.add_protocol("irc", &protocol);
+        server.add_network("irc", &network);
+        
+        // HOOKS ULTRA-PROPRES - on() exposé directement !
+        protocol.on(ON_CONNECT, on_connect, &irc);
+        protocol.on(ON_RECV, on_recv, &irc);
         
         return server.run();
     }
-    catch (std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    catch (SkllException& e) {
+        std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
-
-    return 0;
 }

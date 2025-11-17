@@ -1,16 +1,30 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   signals.cpp                                        :+:      :+:    :+:   */
+/*   SkllSignals.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/03 22:48:02 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/03 22:48:02 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/17 02:31:16 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/17 02:31:16 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <csignal>
+#pragma once
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <iostream>
+#include <cstring>
 
-volatile sig_atomic_t g_running = 1;
+class SkllSignals {
+	private:
+		static int	_pipe[2];
+		static void	_handler(int sig);
 
+	public:
+		static void	setup();
+		static void	cleanup();
+		static int	get_read_fd();
+		static bool	check();
+};

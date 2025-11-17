@@ -13,37 +13,37 @@
 #pragma once
 #include <Sockell/SkllNetwork.hpp>
 #include <Sockell/SkllChannel.hpp>
+#include <Sockell/SkllSignals.hpp>
 #include <sys/resource.h>
 #include <map>
-#include <string>
-
-class SkllNetwork;
 
 class SkllServer {
-private:
-    int  _clients_max;
-    int  _reserved_fd;
-    bool _running;
-    
-    std::map<std::string, SkllNetwork> _networks_owned;
-    std::map<std::string, SkllChannel> _channels_owned;
+	private:
+		int		_max_clients;
+		int		_reserved;
+		bool	_running;
 
-public:
-    SkllServer(int max_clients, int reserved_fd);
-    ~SkllServer();
-    
-    int  run();
-    void stop();
-    
-    SkllNetwork& network(const std::string& name, int timeout, int queue);
-    SkllChannel& channel(const std::string& name, bool is_default = false);
-    
-    std::string print_networks() const;
-    void update_fd_limits();
+		std::map<std::string, SkllNetwork*>	_nets;
+		std::map<std::string, SkllChannel*>	_chans;
+	public:
+		SkllHook	hook;
 
-private:
-    int _count_listening_sockets() const;
-    
-    SkllServer(const SkllServer&);
-    SkllServer& operator=(const SkllServer&);
+		~SkllServer();
+		SkllServer(int max_cli, int res);
+		SkllServer(const SkllServer &other);
+		SkllServer	&operator=(const SkllServer &other);
+		
+		int		run();
+		void	stop();
+		void	add_network(const std::string &n, SkllNetwork *net);
+		void	add_channel(const std::string &n, SkllChannel *ch);
+		void	broadcast(const char *d, size_t l);
+		void	update_fd_limits();
+		
+		SkllNetwork	*get_network(const std::string &n);
+		SkllChannel	*get_channel(const std::string &n);
+		SkllServer	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
+
+	private:
+		int	_count_sockets() const;
 };
