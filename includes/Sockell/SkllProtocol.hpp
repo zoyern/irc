@@ -33,11 +33,11 @@ class SkllProtocol {
 
 		~SkllProtocol();
 		SkllProtocol();
+		SkllProtocol(const std::string &name, const std::string &addr, int port, int opts);
 		SkllProtocol(const SkllProtocol &other);
 		SkllProtocol	&operator=(const SkllProtocol &other);
 
 		void	run();
-		void	create(const std::string &name, const std::string &addr, int port, int opts);
 		void	add_client(int fd, SkllClient *c);
 		void	remove_client(int fd);
 		void	send(int fd, const char *data, size_t len);

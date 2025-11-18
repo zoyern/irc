@@ -72,9 +72,11 @@ void SkllNetwork::set_server(SkllServer* s) {
     _server = s;
 }
 
-void SkllNetwork::add_protocol(const std::string& name, SkllProtocol* p) {
-    if (!p) throw SkllException("NULL protocol");
-    _protos[name] = p;
+SkllProtocol	&SkllNetwork::listen(const SkllProtocol &protocol) {
+	typedef std::map<std::string, SkllProtocol*>::iterator It;
+    std::pair<It, bool> res = _protocols.insert(std::make_pair(protocol.get_name(), (SkllProtocol*)&protocol));
+    _protocols_fd[protocol.get_fd()] = res.first->second;
+    return (*(res.first->second));
 }
 
 SkllProtocol* SkllNetwork::get_protocol(const std::string& name) {
@@ -272,3 +274,11 @@ std::string SkllNetwork::_err_epoll() {
     }
     return o.str();
 }
+
+int		SkllNetwork::start() { std::cout << "[Network] "<< _name << " Stating binding..." << std::endl;return(0);}
+int		SkllNetwork::wait() {return(0);}
+int		SkllNetwork::stop() {std::cout << "[Network] "<< _name << " stoped..." << std::endl;return(0);}
+int		SkllNetwork::shutdown() {std::cout << "[Network] "<< _name << " Shutdown !" << std::endl;return(0);}
+
+std::string	SkllNetwork::name() const {return (_name);}
+int	SkllNetwork::fd() const{return (_epfd);}

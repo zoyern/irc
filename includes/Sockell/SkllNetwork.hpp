@@ -30,6 +30,9 @@ class SkllNetwork {
 		std::vector<epoll_event>				_ev;
 		std::map<std::string, SkllProtocol*>	_protos;
 		std::map<int, SkllProtocol*>			_fd_proto;
+
+		std::map<std::string, SkllProtocol*>	_protocols;
+		std::map<int, SkllProtocol*>			_protocols_fd;
 	public:
 		SkllHook	hook;
 
@@ -40,11 +43,15 @@ class SkllNetwork {
 		SkllNetwork	&operator=(const SkllNetwork &other);
 		
 		void			run();
+		int		start();
+		int		wait();
+		int		stop();
+		int		shutdown();
 		void			update();
 		void			set_server(SkllServer *s);
 		void			add_event(int fd);
 		void			destroy_event(int fd);
-		void			add_protocol(const std::string &name, SkllProtocol *p);
+		SkllProtocol	&listen(const SkllProtocol &protocol);
 		void			broadcast(const char *data, size_t len);
 		SkllNetwork		&on(int event, SkllHook::Callback cb, void *user_data = NULL);
 		
@@ -61,4 +68,11 @@ class SkllNetwork {
 		void		_accept(int fd);
 		void		_recv(int fd);
 		std::string	_err_epoll();
+
+	public:
+		//set_wakeup(bool opt = false);
+
+		std::string	name() const;
+		int	fd() const;
+		
 };

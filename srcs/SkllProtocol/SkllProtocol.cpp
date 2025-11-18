@@ -22,6 +22,26 @@
 #include <sstream>
 
 SkllProtocol::SkllProtocol() : _fd(-1), _port(0), _opts(0), _bound(false) {}
+SkllProtocol::SkllProtocol(const std::string &name, const std::string &addr, int port, int opts)
+	: _fd(-1),
+	_port(0),
+	_opts(0),
+	_bound(false)
+	{
+	_name = name;
+    _addr = addr;
+    _port = port;
+    _opts = opts;
+    
+    int family = (opts & SKLL_IPV6) ? AF_INET6 : AF_INET;
+    int type = (opts & SKLL_UDP) ? SOCK_DGRAM : SOCK_STREAM;
+    
+    _fd = socket(family, type, 0);
+    if (_fd < 0) throw SkllErrorSocket(_err_socket());
+    
+    fcntl(_fd, F_SETFL, O_NONBLOCK);
+    set_reuseaddr().set_nodelay().set_quickack();
+	}
 
 SkllProtocol::SkllProtocol(const SkllProtocol& other)
     : _fd(-1), _name(other._name), _addr(other._addr), _port(other._port),
@@ -45,21 +65,6 @@ SkllProtocol::~SkllProtocol() {
     if (_fd >= 0) close(_fd);
 }
 
-void SkllProtocol::create(const std::string& name, const std::string& addr, int port, int opts) {
-    _name = name;
-    _addr = addr;
-    _port = port;
-    _opts = opts;
-    
-    int family = (opts & SKLL_IPV6) ? AF_INET6 : AF_INET;
-    int type = (opts & SKLL_UDP) ? SOCK_DGRAM : SOCK_STREAM;
-    
-    _fd = socket(family, type, 0);
-    if (_fd < 0) throw SkllErrorSocket(_err_socket());
-    
-    fcntl(_fd, F_SETFL, O_NONBLOCK);
-    set_reuseaddr().set_nodelay().set_quickack();
-}
 
 void SkllProtocol::run() {
     if (_bound) return;

@@ -13,37 +13,61 @@
 #pragma once
 #include <Sockell/SkllNetwork.hpp>
 #include <Sockell/SkllChannel.hpp>
-#include <Sockell/SkllSignals.hpp>
+#include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllHook.hpp>
 #include <sys/resource.h>
 #include <map>
+#include <string>
+
+#define SKLL_FD_MARGE 100
 
 class SkllServer {
 	private:
-		int		_max_clients;
-		int		_reserved;
-		bool	_running;
+		int		_max_clients; // client total sur le serveur
+		int		_reserved; // reserved de fd si on demande limit de fd de base 0
+		int		_used; // fd utiliser actuellement permet la mise a jour equivalent a count du nombre de fd ouvert network client ou socket
+		int		_count; // fd utiliser par des client ne prend pas en compte les network et socket
+		bool	_running; // obligatoire mdr
 
-		std::map<std::string, SkllNetwork*>	_nets;
+		SkllChannel							*_chan_default;
 		std::map<std::string, SkllChannel*>	_chans;
+		std::map<std::string, SkllClient*>	_clients; // tous les client existant sur chaque network protocol
+		std::map<std::string, SkllNetwork*>	_nets;
+		std::map<int, SkllNetwork*>			_nets_fd;
+		std::map<int, SkllClient*>			_clients_tcp;
+
+		SkllHook							hook;
 	public:
-		SkllHook	hook;
 
 		~SkllServer();
-		SkllServer(int max_cli, int res);
-		SkllServer(const SkllServer &other);
-		SkllServer	&operator=(const SkllServer &other);
+		SkllServer(int max_client = 1000, int reserved = 0);
 		
 		int		run();
-		void	stop();
-		void	add_network(const std::string &n, SkllNetwork *net);
-		void	add_channel(const std::string &n, SkllChannel *ch);
-		void	broadcast(const char *d, size_t l);
-		void	update_fd_limits();
-		
-		SkllNetwork	*get_network(const std::string &n);
-		SkllChannel	*get_channel(const std::string &n);
-		SkllServer	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
+		int		start();
+		int		stop();
 
+		size_t		update_fd_limits();
+		SkllServer	&max_client(int size);
+		SkllServer	&set_reserved_fd(int size);
+		SkllServer	&on(int event, SkllHook::Callback callback , void *data);
+		SkllChannel	&channels(const SkllChannel &chan, bool set_default = false); // si chan name existe deja renvoie l'objet deja existant si default true prend celui deja existant et le met en default
+		SkllClient	&clients(const SkllClient &client);
+		SkllNetwork	&networks(const SkllNetwork &net);	
+
+		int			max_client() const;
+		int			reserved_fd() const;
+		int			used_fd() const;
+		int			count() const;
+		bool		running() const;
+		SkllChannel	*get_channel_default();
+		SkllChannel	*get_channel(const std::string &name);
+		SkllClient	*get_client(const std::string &id); // adress:port
+		SkllClient	*get_client(const int &fd);
+		SkllNetwork	*get_network(const std::string &name);
+		SkllNetwork	*get_network(const int &fd);
 	private:
-		int	_count_sockets() const;
+		SkllServer(const SkllServer &other);
+		SkllServer	&operator=(const SkllServer &);
+
+
 };

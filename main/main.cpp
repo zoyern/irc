@@ -40,22 +40,14 @@ int main(int argc, char const **argv) {
     try {
         IRCServer irc(argv[2]);
         
-        SkllServer server(IRC_MAX_CLIENTS, 10);
-        SkllNetwork network("irc", 100, 128);
-        SkllProtocol protocol;
-        
-        // Setup protocol (0 new !)
-        protocol.create("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4);
-        protocol.set_nodelay().set_quickack();
-        
-        irc.set_protocol(&protocol);
-        
-        network.add_protocol("irc", &protocol);
-        server.add_network("irc", &network);
-        
-        // HOOKS ULTRA-PROPRES - on() exposé directement !
-        protocol.on(ON_CONNECT, on_connect, &irc);
-        protocol.on(ON_RECV, on_recv, &irc);
+        SkllProtocol	proto("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4);
+		SkllNetwork		network("net", 100, 128);
+		SkllServer		server(IRC_MAX_CLIENTS, 10);
+
+		server.networks(network)
+			.listen(proto)
+			.on(ON_CONNECT, on_connect, &irc)
+        	.on(ON_RECV, on_recv, &irc);
         
         return server.run();
     }
