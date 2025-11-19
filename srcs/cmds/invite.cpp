@@ -10,3 +10,28 @@ void invite(int fd, std::string nickName)
 
 	// sent message to invited user only
 }
+
+epoll -> event ->recv
+recv -> message ->
+
+message parser
+"NICK user"
+"#general user"
+
+main channel(genral)
+	.on(ON_CONNECT, registerclientchannel, irc)
+
+	registerclientchannel(irc, eventserver)
+	Client
+	serveur
+	Protocol
+	message
+	channel
+if (#)
+	get_channel();
+
+channel.add(user);
+
+
+-> INVITE
+INVITE -> irc.getclient("general")
