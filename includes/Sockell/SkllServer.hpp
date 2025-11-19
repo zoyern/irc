@@ -36,7 +36,7 @@ class SkllServer {
 		std::map<int, SkllNetwork*>			_nets_fd;
 		std::map<int, SkllClient*>			_clients_tcp;
 
-		SkllHook							hook;
+		SkllHook							_hook;
 	public:
 
 		~SkllServer();
