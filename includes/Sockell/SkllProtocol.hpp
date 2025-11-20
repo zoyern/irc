@@ -124,12 +124,7 @@ struct SkllProtocolTCPOptions {
     int  keepalive_probes = 9;
 };
 
-//possible pendant l'execution
-struct SkllProtocolUDPOptions
-{
-    bool    broadcast = false;
-};
-
+ 
 struct SkllProtocolAddrs
 {
 	sockaddr_storage local_addr;
@@ -144,7 +139,7 @@ class SkllProtocol {
 	private:
 		int			_fd;
 		std::string	_name;
-		int			_opts; //tcp udp ipv4 ivp6
+		int			_opts;
 		bool		_running;
 
 		std::map<std::string, SkllClient*>	_clients;
@@ -156,49 +151,44 @@ class SkllProtocol {
 		~SkllProtocol();
 		SkllProtocol();
 		SkllProtocol(const std::string &name, const std::string &addr, int port, int opts);
+enum SkllEvent {
+    ON_START      = 1 << 0,
+    ON_UPDATE     = 1 << 1,
+    ON_SHUTDOWN   = 1 << 2,
+    ON_CONNECT    = 1 << 3,
+    ON_DISCONNECT = 1 << 4,
+    ON_ERROR      = 1 << 5,
+    ON_TIMEOUT    = 1 << 6,
+    ON_RECV       = 1 << 7,
+    ON_SEND       = 1 << 8
+};
 
 
-		void	run();
-		void	add_client(int fd, SkllClient *c);
-		void	remove_client(int fd);
+		// bindind finial on peux plus toucher a socket
+		int		on_start();
+		int		on_update();
+		int		on_stop();
+		int		on_shutdowm();
+		int		on_connect();
+		int		on_disconnect();
+		int		on_error();
+		int		on_recv();
+		int		on_send();
+		
+        
+
 		void	send(int fd, const char *data, size_t len);
 		void	broadcast(const char *data, size_t len);
 
 		SkllProtocol	&set_reuseaddr(bool e = true);
 		SkllProtocol	&set_nodelay(bool e = true);
 		SkllProtocol	&set_quickack(bool e = true);
-		SkllProtocol	&set_keepalive(bool e = true);
 		SkllProtocol	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
 
 
 	private:
+		SkllClient	&client(SkllClient &client);
+		
 		SkllProtocol(const SkllProtocol &);
 		SkllProtocol	&operator=(const SkllProtocol &);
 };
-
-std::string Socket::get_ip() const {
-    char buf[INET6_ADDRSTRLEN]; // Assez grand pour IPv4 ET IPv6
-    
-    if (remote_addr.ss_family == AF_INET) {
-        // IPv4
-        struct sockaddr_in* addr = (struct sockaddr_in*)&remote_addr;
-        inet_ntop(AF_INET, &addr->sin_addr, buf, sizeof(buf));
-    } else if (remote_addr.ss_family == AF_INET6) {
-        // IPv6
-        struct sockaddr_in6* addr = (struct sockaddr_in6*)&remote_addr;
-        inet_ntop(AF_INET6, &addr->sin6_addr, buf, sizeof(buf));
-    } else {
-        return "unknown";
-    }
-    
-    return std::string(buf);
-}
-
-uint16_t Socket::get_port() const {
-    if (remote_addr.ss_family == AF_INET) {
-        return ntohs(((struct sockaddr_in*)&remote_addr)->sin_port);
-    } else if (remote_addr.ss_family == AF_INET6) {
-        return ntohs(((struct sockaddr_in6*)&remote_addr)->sin6_port);
-    }
-    return 0;
-}

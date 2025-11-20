@@ -59,6 +59,8 @@ int main(int argc, char const **argv)
 
 		server.networks(network)
 			.listen(protocol_irc)
+
+		protocol_irc
 			.reuse_addr(true)
 			.reuse_port(false)
 			.linger(5652)
