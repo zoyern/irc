@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   irc.hpp                                            :+:      :+:    :+:   */
+/*   Sockell.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -11,31 +11,40 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <vector>
-#include <stdint.h>
+#include <ctime>
+#include <sstream>
+#include <string>
+#include <map>
 
-typedef std::vector<unsigned char> SkllBuffer;
+#define SKLL_RESET      "\033[0m"
+#define SKLL_BOLD       "\033[1m"
+#define SKLL_DIM        "\033[2m"
+#define SKLL_RED        "\033[31m"
+#define SKLL_GREEN      "\033[32m"
+#define SKLL_YELLOW     "\033[33m"
+#define SKLL_BLUE       "\033[34m"
+#define SKLL_MAGENTA    "\033[35m"
+#define SKLL_CYAN       "\033[36m"
+#define SKLL_WHITE      "\033[37m"
+#define SKLL_GRAY       "\033[90m"
 
-enum SkllProtocolType {
-    SKLL_TCP  = 1 << 0,
-    SKLL_UDP  = 1 << 1,
-    SKLL_IPV4 = 1 << 2,
-    SKLL_IPV6 = 1 << 3
-};
+#define SKLL_ON_START       (1 << 0)
+#define SKLL_ON_UPDATE      (1 << 1)
+#define SKLL_ON_STOP        (1 << 2)
+#define SKLL_ON_SHUTDOWN    (1 << 3)
+#define SKLL_ON_CONNECT     (1 << 4)
+#define SKLL_ON_DISCONNECT  (1 << 5)
+#define SKLL_ON_ERROR       (1 << 6)
+#define SKLL_ON_TIMEOUT     (1 << 7)
+#define SKLL_ON_RECV        (1 << 8)
+#define SKLL_ON_SEND        (1 << 9)
+#define SKLL_ON_SIGNAL      (1 << 10)
 
-enum SkllEvent {
-    ON_START      = 1 << 0,
-    ON_UPDATE     = 1 << 1,
-    ON_SHUTDOWN   = 1 << 2,
-    ON_CONNECT    = 1 << 3,
-    ON_DISCONNECT = 1 << 4,
-    ON_ERROR      = 1 << 5,
-    ON_TIMEOUT    = 1 << 6,
-    ON_RECV       = 1 << 7,
-    ON_SEND       = 1 << 8
-};
+#define SKLL_TCP    (1 << 0)
+#define SKLL_UDP    (1 << 1)
+#define SKLL_IPV4   (1 << 2)
+#define SKLL_IPV6   (1 << 3)
 
-struct SkllHookData {
-    void* lib_data;
-    void* user_data;
-};
+#define SKLL_TIME_HHMMSS "%H:%M:%S"
+
+struct Sockell { static std::string timestamp();};

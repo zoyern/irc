@@ -1,16 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   IrcServ.hpp                                        :+:      :+:    :+:   */
+/*   SkllServer.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/03 22:17:56 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/03 22:17:56 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/23 02:09:24 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/23 02:09:24 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #pragma once
+#include <Sockell.hpp>
 #include <Sockell/SkllNetwork.hpp>
 #include <Sockell/SkllChannel.hpp>
 #include <Sockell/SkllClient.hpp>
@@ -18,56 +19,77 @@
 #include <sys/resource.h>
 #include <map>
 #include <string>
+#include <iostream>
 
-#define SKLL_FD_MARGE 100
+#define SKLLSERVER_FDLOCKED	1024
 
-class SkllServer {
+class SkllServer
+{
 	private:
-		int		_max_clients; // client total sur le serveur
-		int		_reserved; // reserved de fd si on demande limit de fd de base 0
-		int		_used; // fd utiliser actuellement permet la mise a jour equivalent a count du nombre de fd ouvert network client ou socket
-		int		_count; // fd utiliser par des client ne prend pas en compte les network et socket
-		bool	_running; // obligatoire mdr
-
+		bool	_started;
+		bool	_running;
+		bool	_stopped;
+		bool	_mute;
+		size_t	_max_clients;
+		size_t	_reserved;
+		size_t	_used;
+		size_t	_fd_limit;
+		
+		SkllHook							_hook;
 		SkllChannel							*_chan_default;
 		std::map<std::string, SkllChannel*>	_chans;
-		std::map<std::string, SkllClient*>	_clients; // tous les client existant sur chaque network protocol
+		std::map<std::string, SkllClient*>	_clients;
 		std::map<std::string, SkllNetwork*>	_nets;
 		std::map<int, SkllNetwork*>			_nets_fd;
 		std::map<int, SkllClient*>			_clients_tcp;
 
-		SkllHook							_hook;
 	public:
-
 		~SkllServer();
-		SkllServer(int max_client = 1000, int reserved = 0);
+		SkllServer(int max_client = 1000, bool mute = false, int reserved = 0);
 		
-		int		run();
 		int		start();
+		int		run();
 		int		stop();
+		int		shutdown();
+		void	broadcast(const std::string &msg);
+		void	broadcast(const std::string &msg, int opts);
+		void	broadcast(SkllMessage &msg);
+		size_t	update_fd_limits();
+		
+	private:
+		SkllServer(const SkllServer&);
+		SkllServer 	&operator=(const SkllServer&);
+		void		trigger_event(int type);
 
-		size_t		update_fd_limits();
-		SkllServer	&max_client(int size);
-		SkllServer	&set_reserved_fd(int size);
-		SkllServer	&on(int event, SkllHook::Callback callback , void *data);
-		SkllChannel	&channels(const SkllChannel &chan, bool set_default = false); // si chan name existe deja renvoie l'objet deja existant si default true prend celui deja existant et le met en default
+	public:
+		SkllServer	&max_client(size_t size);
+		SkllServer	&reserved_fd(size_t size);
+		SkllServer	&mute(bool enable);
+		SkllServer	&on(int event, SkllHook::Callback callback, void *data);
+		SkllChannel	&channels(const SkllChannel &chan, bool set_default = false);
 		SkllClient	&clients(const SkllClient &client);
-		SkllNetwork	&networks(const SkllNetwork &net);	
-
-		int			max_client() const;
-		int			reserved_fd() const;
-		int			used_fd() const;
-		int			count() const;
-		bool		running() const;
+		SkllNetwork	&networks(const SkllNetwork &net);
+		
+		bool		is_started() const;
+		bool		is_running() const;
+		bool		is_stopped() const;
+		bool		is_muted() const;
+		size_t		count() const;
+		size_t		used_fd() const;
+		size_t		reserved_fd() const;
+		size_t		get_fd_limit() const;
+		size_t		total_networks() const;
+		size_t		total_clients() const;
 		SkllChannel	*get_channel_default();
 		SkllChannel	*get_channel(const std::string &name);
-		SkllClient	*get_client(const std::string &id); // adress:port
-		SkllClient	*get_client(const int &fd);
+		SkllClient	*get_client(const std::string &id);
+		SkllClient	*get_client(int fd);
 		SkllNetwork	*get_network(const std::string &name);
-		SkllNetwork	*get_network(const int &fd);
-	private:
-		SkllServer(const SkllServer &other);
-		SkllServer	&operator=(const SkllServer &);
+		SkllNetwork	*get_network(int fd);
 
-
+		typedef std::map<std::string, SkllChannel*>::iterator   ChannelsMapIt;
+		typedef std::map<std::string, SkllClient*>::iterator    ClientsMapIt;
+		typedef std::map<std::string, SkllNetwork*>::iterator   NetworksMapIt;
+		typedef std::map<int, SkllNetwork*>::iterator           NetworksFdMapIt;
+		typedef std::map<int, SkllClient*>::iterator            ClientsFdMapIt;
 };

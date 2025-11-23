@@ -5,106 +5,67 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/03 22:31:36 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/03 22:31:36 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/23 02:09:32 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/23 02:09:32 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell/SkllServer.hpp>
-#include <Sockell/SkllNetwork.hpp>
-#include <Sockell/SkllProtocol.hpp>
-#include "IRCServer.hpp"
-#include <cstdlib>
+#include <Sockall.hpp>
+#include <IRC.hpp>
+#include <IRC/IRCServer.hpp>
 #include <iostream>
+#include <cstdlib>
 
-enum ControlType
-{
-	IRC_END  = 1 << 0,	  // 0b0001
-	IRC_END2 = 1 << 1,  // 0b0010
-};
+#define	IRC_MAX_CLIENT		10000
+#define	IRC_TIMEOUT 		0
+#define	IRC_QUEUE_EVENT		128
 
-void on_connect(void *lib, void *user)
-{
-	if (!lib || !user)
-		return;
-	int *fd = static_cast<int *>(lib);
-	IRCServer *irc = static_cast<IRCServer *>(user);
-	irc->on_connect(*fd);
-}
+int main(int argc, char **argv) {
+	if (argc != 3) return (std::cerr << "Usage: " << argv[0] << " <port> <password>" << std::endl, 1);
+	
+	int port = std::atoi(argv[1]); std::string password = argv[2];
+	if (port < 1024 || port > 65535) return (std::cerr << "Error: Port must be between 1024-65535" << std::endl, 1);
+	try {
+		IRCServer		irc_server(password);
+		SkllServer		server(IRC_MAX_CLIENT);
+		SkllProtocol	irc_tcp("irc", "0.0.0.0", port, SKLL_TCP | SKLL_IPV4);
+		SkllNetwork		network("irc_network", IRC_TIMEOUT, IRC_QUEUE_EVENT);
 
-void on_recv(void *lib, void *user)
-{
-	(void)lib;
-	if (!user)
-		return;
-	IRCServer *irc = static_cast<IRCServer *>(user);
-	irc->on_recv();
-}
-
-int main(int argc, char const **argv)
-{
-	if (argc != 3)
-	{
-		std::cout << "Usage: ./ircserv <port> <password>\n";
-		return 1;
-	}
-
-	try
-	{
-		IRCServer irc(argv[2]);
-
-		SkllProtocol protocol_irc("irc", "0.0.0.0", std::atoi(argv[1]), SKLL_TCP | SKLL_IPV4);
-		SkllNetwork network("net", 100, 128);
-		SkllServer server(IRC_MAX_CLIENTS, 10);
-
-		server.networks(network)
-			.listen(protocol_irc)
-
-		protocol_irc
-			.reuse_addr(true)
-			.reuse_port(false)
-			.linger(5652)
-			.timout_send(0)
-			.timout_recv(0)
-			.recv_timeout(0)
-			.buffer(0)
-			.chunk(16)
-			.on(ON_CONNECT, on_connect)
-			.on(ON_RECV, on_recv)
-			.EOM(IRC_END, "\r\n") // End Of Message
-			.EOM(IRC_END2, "\n");
-
-		protocol.ctrl(IRC_END | IRC_END2)
-			.route("USER ", handle_user) //  <username>> <password>
-			.route("NICK  ", handle_nick) // <nickname>
-			.route("JOIN ", handle_user); //<channel>{,<channel>} [<key>{,<key>}]
-
-		protocol.ctrl(IRC_END | IRC_END2)
-			.route("PRIVMSG", handle_privmsg)
-				.match("#", handle_channel)			 // ← Si '#'
-				.match("@", handle_bot);				 // ← Ou si '@'
-
-		protocol.ctrl(IRC_END | IRC_END2)
-			.route("KICK ", handle_nick) // <channel> <user> [<comment>]
-			.route("INVITE ", handle_user) // <nickname> <channel>
-			.route("TOPIC", handle_user) // <channel> [<topic>]
-			.route("QUIT", handle_quit); // [<Quit message>]
-
-		// Middleware : callback principal + sous-callbacks
-		protocol.ctrl(IRC_END | IRC_END2)
-			.route("MODE", handle_mode)
-				.match("i", handle_join_channel) // i - invite-only channel flag;
-				.match("t", handle_join_channel) // t - topic settable by channel operator only flag;
-				.match("k", handle_join_channel) // k - set a channel key (password).
-				.match("o", handle_join_channel) // o - give/take channel operator privileges;
-				.match("l", handle_join_channel);// l - set the user limit to channel;
-
-
-		return server.run();
-	}
-	catch (SkllException &e)
-	{
-		std::cerr << "Error: " << e.what() << "\n";
-		return 1;
-	}
+		server
+			.on(SKLL_ON_START, IRCServer::on_server_start, &irc_server)
+			.networks(network)
+				.on(SKLL_ON_SIGNAL, on_signal, NULL)
+				.listen(irc_tcp)
+					.set_reuseaddr(true)
+					.set_nodelay(true)
+					.set_keepalive(true)
+					.set_chunk_size(4096)
+					.on(SKLL_ON_CONNECT, IRCServer::on_client_connect, &irc_server)
+					.on(SKLL_ON_DISCONNECT, IRCServer::on_client_disconnect, &irc_server)
+					.router()
+						.delim(IRC_CRLF, "\r\n")
+						.delim(IRC_LF, "\n")
+					.router()
+						.ctrl(IRC_CRLF | IRC_LF)
+							.route("PASS ", irc_cmd_pass, &irc_server)
+							.route("NICK ", irc_cmd_nick, &irc_server)
+							.route("USER ", irc_cmd_user, &irc_server)
+							.route("JOIN ", irc_cmd_join, &irc_server)
+							.route("PART ", irc_cmd_part, &irc_server)
+							.route("TOPIC ", irc_cmd_topic, &irc_server)
+							.route("PRIVMSG ", irc_cmd_privmsg, &irc_server)
+							.route("MODE ", irc_cmd_mode, &irc_server)
+								.match("i", irc_cmd_mode_i, &irc_server)
+								.match("t", irc_cmd_mode_t, &irc_server)
+								.match("k", irc_cmd_mode_k, &irc_server)
+								.match("o", irc_cmd_mode_o, &irc_server)
+								.match("l", irc_cmd_mode_l, &irc_server)
+							.route("KICK ", irc_cmd_kick, &irc_server)
+							.route("INVITE ", irc_cmd_invite, &irc_server)
+							.route("PING ", irc_cmd_ping, &irc_server)
+							.route("QUIT", irc_cmd_quit, &irc_server);
+		return (std::cout << SKLL_GREEN << "\n[" << irc_timestamp() << "] " << SKLL_RESET << "Server ready on port " << SKLL_BOLD << port << SKLL_RESET << std::endl,
+			server.run());
+	} catch (const std::exception &e)
+		{ return (std::cerr << IRC_COLOR_ERROR << "[" << irc_timestamp() << "] Fatal: " << SKLL_RESET << e.what() << std::endl, 1); }
 }

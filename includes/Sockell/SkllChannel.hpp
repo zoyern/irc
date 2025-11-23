@@ -13,23 +13,34 @@
 #pragma once
 #include <Sockell/SkllHook.hpp>
 #include <string>
-#include <set>
+#include <map>
+#include <cstddef>
+
+class SkllClient;
 
 class SkllChannel {
 	public:
-		SkllHook				hook;
-		std::string				name;
-		std::set<std::string>	client_ids;
-		void					*userdata;
+		std::string	name;
+		SkllHook	hook;
+		void		*userdata;
 
+		std::map<int, SkllClient*>	clients;
+		
 		~SkllChannel();
 		SkllChannel();
 		SkllChannel(const std::string &n);
 
+		void broadcast(const std::string &msg, int exclude_fd);
+		
 		SkllChannel	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
-		void		add_client(const std::string &id);
-		void		remove_client(const std::string &id);
+		
+		void		add_client(int fd, SkllClient *client);
+		void		remove_client(int fd);
+		SkllClient	*get_client(int fd);
+		bool		has_client(int fd) const;
+		size_t		client_count() const;
 
-		bool		has_client(const std::string &id) const;
-		size_t		size() const;
+	private:
+		SkllChannel(const SkllChannel&);
+		SkllChannel	&operator=(const SkllChannel&);
 };

@@ -11,184 +11,113 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <Sockell.hpp>
 #include <Sockell/SkllHook.hpp>
-#include <Sockell/SkllErrors.hpp>
+#include <Sockell/SkllEvent.hpp>
 #include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllMessage.hpp>
+#include <Sockell/SkllRouter.hpp>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <string>
 #include <map>
 
-/*
-
-eth0 → ethernet
-wlan0 → wifi
-lo → loopback
-docker0 → interface Docker
-tun0 → VPN
-wg0 → WireGuard
-rmnet → réseau mobile
-
-
-struct stat st;
-fstat(fd, &st);
-
-if (S_ISSOCK(st.st_mode)) {
-    // C'est un socket
-} else if (S_ISREG(st.st_mode)) {
-    // C'est un fichier
-}
-
- a utiliser pour les signaux en callback pour les signaux fichier ou autres a rajouté important pour géré les signaux
-
-TCP_NODELAY  = 1  ✓
-SO_REUSEADDR = 1  ✓
-O_NONBLOCK   = 1  ✓
-SO_KEEPALIVE = 1  ✓
-cpp// Heartbeat IRC
-server.add_timer(30000, heartbeat_callback);  // 30s
-
-// Timeout client inactif
-client.add_timer(300000, disconnect_idle);    // 5min
-
-// Rate limiting
-client.add_timer(1000, reset_message_count);  // 1s
-
-enum FDType {
-    FD_SOCKET_LISTENER,
-    FD_SOCKET_CLIENT,
-    FD_TIMER,
-    FD_SIGNAL,
-    FD_EVENT,
-    FD_PIPE,
-    FD_USER_CUSTOM
-};
-
-std::vector<uint8_t> buffer;
-buffer.resize(4096);
-recv(fd, &buffer[0], buffer.size(), 0);
-
-
-Protocol: - Bufferise bytes bruts
- - Cherche délimiteur(s) configuré(s)
- - Quand trouvé → callback avec bytes bruts
- - PAS de parsing, PAS de string (sauf si callback) si callback renvoie pas en brut mais renvoie un objet message dans le quelle se trouve le tableau vecteur de byte avec des fonction utile pour convertir ce vecteur en nouveau message par exemple on recois un message et dans cette class il y a les fonction send qui reprend le protocol par lequel il a été creer donc acces au server network et l'idée c'est que on puisse faire send(" msg " int "msg" bool) et du coup lui appelle le send de protocol qui lui bufferise tous ce qu'il as recu donc une string qui contient un peu tout mais toi tu t'en fout tout est mis en byte a envoyer et derriere quand ta un recv tu as ce tableau et tu sait ok donc j'ai mis msg donc je veux recuperer msg = to<std::string> puis a oui apres j'ai un int donc to<int> etc et tu pourrais avoir un msg = to() simple qui permet de récuperer une string compléte l'idée c'est que le buffer de recv est comme une stringstream ca permet de parsé les valeur donné et tout je sais pas si tu te souviens de notre conversation avec la console ou on avais reussi a faire console.log() << "hey" << var << bool; ca peux etre ultra pratique de construire sont message comme ca
-
-message get network pour send si besoin message contient le tableau de byte complet sans le $end
-
-erreurs //  451
-
- */
-
-enum e_SkllProtocolConnexion
-{
-	ETERNET, // eth0
-	WIFI, // wlan0
-	LOOPBACK, // lo
-	DOCKER, // docker0
-	VPN, // tun0
-	WIREGUARD, // wg0
-	MOBILE, // rmnet
-}
-
-enum SkllProtocolOpt {
-    SKLL_REUSEADDR      = 1 << 0,
-    SKLL_REUSEPORT     = 1 << 1,
-    SKLL_SENDBUF   = 1 << 2,
-    SKLL_RECVBUF    = 1 << 3,
-    SKLL_LINGER = 1 << 4,
-    SKLL_TIMEOUT_SEND      = 1 << 5,
-    SKLL_TIMEOUT_RECV    = 1 << 6,
-    SKLL_BUFFER       = 1 << 7,
-    SKLL_CHUNK       = 1 << 8
-
-};
+class SkllNetwork;
 
 struct SkllProtocolOptions {
-    bool reuse_addr = true;
-    bool reuse_port = false;
-    bool send_buf = false;
-    bool recv_buf = false;
-    bool linger = false;
-    int send_timeout = 0;
-    int recv_timeout = 0;
-	int buffer = 512;
-	int	chunk = 16;
+    bool reuse_addr;
+    bool reuse_port;
+    int send_buf_size;
+    int recv_buf_size;
+    int send_timeout;
+    int recv_timeout;
+    int buffer_size;
+    int chunk_size;
+    
+    SkllProtocolOptions();
 };
-// possible pendant l'execution 
+
 struct SkllProtocolTCPOptions {
-    bool nodelay       = true;
-    bool cork          = false;   // remplace quicKARK
-    bool quickack      = false;
-    int  keepalive_time   = 7200;
-    int  keepalive_intvl  = 75;
-    int  keepalive_probes = 9;
+    bool nodelay;
+    bool cork;
+    bool quickack;
+    bool keepalive;
+    int keepalive_time;
+    int keepalive_intvl;
+    int keepalive_probes;
+    
+    SkllProtocolTCPOptions();
 };
-
- 
-struct SkllProtocolAddrs
-{
-	sockaddr_storage local_addr;
-	sockaddr_storage remote_addr;
-	socklen_t        local_len;
-	socklen_t        remote_len;
-};
-
-
 
 class SkllProtocol {
-	private:
-		int			_fd;
-		std::string	_name;
-		int			_opts;
-		bool		_running;
-
-		std::map<std::string, SkllClient*>	_clients;
-		std::map<int, SkllClient*>			_clients_tcp;
-
-		SkllHook							_hook;
-	public:
-
-		~SkllProtocol();
-		SkllProtocol();
-		SkllProtocol(const std::string &name, const std::string &addr, int port, int opts);
-enum SkllEvent {
-    ON_START      = 1 << 0,
-    ON_UPDATE     = 1 << 1,
-    ON_SHUTDOWN   = 1 << 2,
-    ON_CONNECT    = 1 << 3,
-    ON_DISCONNECT = 1 << 4,
-    ON_ERROR      = 1 << 5,
-    ON_TIMEOUT    = 1 << 6,
-    ON_RECV       = 1 << 7,
-    ON_SEND       = 1 << 8
-};
-
-
-		// bindind finial on peux plus toucher a socket
-		int		on_start();
-		int		on_update();
-		int		on_stop();
-		int		on_shutdowm();
-		int		on_connect();
-		int		on_disconnect();
-		int		on_error();
-		int		on_recv();
-		int		on_send();
-		
-        
-
-		void	send(int fd, const char *data, size_t len);
-		void	broadcast(const char *data, size_t len);
-
-		SkllProtocol	&set_reuseaddr(bool e = true);
-		SkllProtocol	&set_nodelay(bool e = true);
-		SkllProtocol	&set_quickack(bool e = true);
-		SkllProtocol	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
-
-
-	private:
-		SkllClient	&client(SkllClient &client);
-		
-		SkllProtocol(const SkllProtocol &);
-		SkllProtocol	&operator=(const SkllProtocol &);
+private:
+    int _fd;
+    std::string _name;
+    std::string _addr;
+    int _port;
+    int _opts;
+    
+    bool _started;
+    bool _running;
+    bool _stopped;
+    
+    SkllNetwork *_network;
+    SkllProtocolOptions _options;
+    SkllProtocolTCPOptions _tcp_options;
+    
+    std::map<int, SkllClient*> _clients;
+    SkllRouter _router;
+    
+public:
+	SkllHook _hook;
+    SkllProtocol();
+    SkllProtocol(const std::string &name, const std::string &addr, int port, int opts);
+    ~SkllProtocol();
+    
+    int start();
+    int run();
+    int stop();
+    int shutdown();
+    
+    SkllProtocol &on(int event, SkllHook::Callback callback, void *user_data = NULL);
+    
+    SkllRouter &router();
+    
+    void add_client(int fd, SkllClient *client);
+    void remove_client(int fd);
+    SkllClient *get_client(int fd);
+    const std::map<int, SkllClient*> &get_clients() const;
+    
+    void send(int fd, SkllMessage &msg);
+    void send(int fd, const std::string &data);
+    void broadcast(SkllMessage &msg);
+    void broadcast(const std::string &data);
+    void on_recv_data(int fd, const uint8_t *data, size_t len);
+    
+    SkllProtocol &set_reuseaddr(bool enable = true);
+    SkllProtocol &set_nodelay(bool enable = true);
+    SkllProtocol &set_keepalive(bool enable = true);
+    SkllProtocol &set_buffer_sizes(int send_size, int recv_size);
+    SkllProtocol &set_chunk_size(int size);
+    
+    void set_network(SkllNetwork *network);
+    SkllNetwork *get_network() const;
+    
+    int get_fd() const;
+    const std::string &get_name() const;
+    const std::string &get_address() const;
+    int get_port() const;
+    bool is_tcp() const;
+    bool is_udp() const;
+    bool is_started() const;
+    bool is_running() const;
+    bool is_stopped() const;
+    
+private:
+    void apply_socket_options();
+    void bind_and_listen();
+    void trigger_event(int type, SkllClient *client = NULL,
+                      SkllMessage *msg = NULL, int error = 0);
+    
+    SkllProtocol(const SkllProtocol&);
+    SkllProtocol &operator=(const SkllProtocol&);
 };

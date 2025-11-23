@@ -11,20 +11,26 @@
 /* ************************************************************************** */
 
 #pragma once
+#include <Sockell.hpp>
 #include <signal.h>
+#include <sys/signalfd.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <iostream>
 #include <cstring>
+#include <iostream>
 
-class SkllSignals {
+class SkllSignals
+{
 	private:
-		static int	_pipe[2];
-		static void	_handler(int sig);
-
+		static int		_signal_fd;
+		static sigset_t	_mask;
 	public:
-		static void	setup();
+		static int	setup();
+		static int	get_fd();
+		static int	read_signal();
 		static void	cleanup();
-		static int	get_read_fd();
-		static bool	check();
+	private:
+		~SkllSignals();
+		SkllSignals();
+		SkllSignals(const SkllSignals&);
+		SkllSignals &operator=(const SkllSignals&);
 };

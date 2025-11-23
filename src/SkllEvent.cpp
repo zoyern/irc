@@ -1,21 +1,27 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Client.cpp                                         :+:      :+:    :+:   */
+/*   SkllEvent.cpp                                      :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/06 03:55:49 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/06 03:55:49 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/21 23:51:10 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/21 23:51:10 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllEvent.hpp>
+#include <cstddef>
 
-SkllClient::SkllClient() : fd(-1), id(""), userdata(NULL) {}
-SkllClient::~SkllClient() {}
-
-SkllClient& SkllClient::on(int event, SkllHook::Callback cb, void* user_data) {
-    hook.on(event, cb, user_data);
-    return *this;
-}
+SkllEvent::SkllEvent()
+	: type(0)
+	, server(NULL)
+	, network(NULL)
+	, protocol(NULL)
+	, client(NULL)
+	, message(NULL)
+	, fd(-1)
+	, signal_num(0)
+	, timer_id(0)
+	, error_code(0)
+	, error_msg(NULL) {}
