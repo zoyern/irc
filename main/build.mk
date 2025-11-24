@@ -14,6 +14,8 @@ MAIN_NAME		= ircserv
 
 MAIN_DIR		= main
 MAIN_SRC_DIR	= $(MAIN_DIR)/src
+MAIN_SRC_CMDS_DIR = $(MAIN_SRC_DIR)/cmds
+CMDS_DIR 		= $(MAIN_SRC_DIR)/cmds
 MAIN_INC_DIR	= $(MAIN_DIR)/includes
 MAIN_BUILD_DIR	= $(MAIN_DIR)/builds
 MAIN_OBJ_DIR	= $(MAIN_BUILD_DIR)/obj
@@ -26,18 +28,27 @@ MAIN_IFLAGS		= -I$(INC_DIR) -I$(MAIN_INC_DIR)
 MAIN_LFLAGS		= -L$(MAIN_LIB_DIR) -l$(LIB_NAME)
 MAIN_DEPFLAGS	= -MMD -MP
 
-MAIN_SRC		=	IRC.cpp
-MAIN_SRC		+=	IRCClient.cpp
-MAIN_SRC		+=	IRCChannel.cpp
-MAIN_SRC		+=	IRCServer.cpp
-MAIN_SRC		+=	IRCCommands.cpp
-MAIN_SRC		+=	IRCErrors.cpp
+MAIN_SRC		=	Irc.cpp
+MAIN_SRC		+=	client.cpp
+MAIN_SRC		+=	channel.cpp
+MAIN_SRC		+=	server.cpp
+MAIN_SRC		+=	cmds/pass.cpp
+MAIN_SRC		+=	cmds/nick.cpp
+MAIN_SRC		+=	cmds/user.cpp
+# MAIN_SRC		+=	IRCCommands.cpp
+# MAIN_SRC		+=	IRCErrors.cpp
+
+# MAIN_SRC_CMDS 	=	pass.cpp
+# MAIN_SRC_CMDS 	+=	nick.cpp
+# MAIN_SRC_CMDS 	+=	user.cpp
 
 MAIN_FILE		=	main.cpp
 
+MAIN_SRC_CMDS_FILES = $(addprefix $(MAIN_SRC_CMDS_DIR)/, $(MAIN_SRC_CMDS))
 MAIN_SRC_FILES	= $(addprefix $(MAIN_SRC_DIR)/, $(MAIN_SRC))
 MAIN_MAIN_FILE	= $(addprefix $(MAIN_DIR)/, $(MAIN_FILE))
 
+MAIN_SRC_CMDS_OBJS = $(patsubst $(MAIN_SRC_CMDS_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_SRC_CMDS_FILES))
 MAIN_SRC_OBJS	= $(patsubst $(MAIN_SRC_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_SRC_FILES))
 MAIN_MAIN_OBJ	= $(patsubst $(MAIN_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_MAIN_FILE))
 
