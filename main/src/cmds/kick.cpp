@@ -1,4 +1,4 @@
-#include "Main.hpp"
+#include "Irc.hpp"
 
 bool isSplitkick(std::string cmd, std::string &channelName, std::string &nick, int fd)
 {

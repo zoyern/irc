@@ -1,4 +1,4 @@
-#include "Main.hpp"
+#include "Irc.hpp"
 
 void quit(int fd, std::string reason)
 {

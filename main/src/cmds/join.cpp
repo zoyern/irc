@@ -1,4 +1,4 @@
-#include "Main.hpp"
+#include "Irc.hpp"
 
 bool isError(Channel *channel, Client *client, std::string password)
 {

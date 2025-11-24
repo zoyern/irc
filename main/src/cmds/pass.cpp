@@ -8,7 +8,7 @@ void pass_cmd(SkllEvent *event, void *user_data)
 	if (!client)
 		return;
 	if (client->isAuth())
-		return client->send(irc_err_alreadyregistred(client->getNick())); // ERR_ALREADYREGISTRED;
+		return client->send(irc_err_alreadyregistred(client->getNick()));;
 	std::string password = event->message->to<std::string>();
 	if(password.empty())
 		return client->send(irc_err_needmoreparams(client->getNick(), password)); //ERR_NEEDMOREPARAMS

@@ -20,6 +20,7 @@
 #include "Channel.hpp"
 #include "Server.hpp"
 #include "Cmds.hpp"
+#include "Errors.hpp"
 
 #define IRC_CRLF    (1 << 0)
 #define IRC_LF      (1 << 1)

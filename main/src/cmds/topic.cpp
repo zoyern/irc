@@ -1,4 +1,4 @@
-#include "Main.hpp"
+#include "Irc.hpp"
 
 bool isSplitTopic(std::string cmd, std::string &channelName, std::string &topic, int fd)
 {
