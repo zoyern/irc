@@ -18,7 +18,7 @@ class Client
 public:
 	Client(void);
 	Client(int fd);
-	Client(std::string p, std::string n, std::string u);
+	Client(std::string n, std::string u);
 	Client(Client const &client);
 	Client &operator=(Client const &client);
 	void setUser(std::string user);
@@ -36,9 +36,9 @@ public:
 	~Client();
 
 private:
-	std::string _user;
 	std::string _nick;
-	int _attempts;
-	bool _isPassCorrect;
+	std::string _user;
 	int _fd;
+	bool _isPassCorrect;
+	int _attempts;
 };

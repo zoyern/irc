@@ -2,7 +2,7 @@
 #include "Irc.hpp"
 Client::Client(void) : _nick(""), _user(""), _fd(-1), _isPassCorrect(false), _attempts(0) {}
 Client::Client(int fd) : _nick(""), _user(""), _fd(fd), _isPassCorrect(false), _attempts(0) {}
-Client::Client(std::string p, std::string n, std::string u) : _nick(n), _user(u), _fd(-1), _isPassCorrect(false), _attempts(0) {}
+Client::Client(std::string n, std::string u) : _nick(n), _user(u), _fd(-1), _isPassCorrect(false), _attempts(0) {}
 Client::Client(const Client &client)
 {
 	*this = client;
@@ -62,7 +62,7 @@ int Client::getFd(void) const
 }
 bool Client::isAuth()
 {
-	return (_fd != -1 && getisPassCorrect && !_nick.empty() && !_user.empty());
+	return (_fd != -1 && getisPassCorrect() && !_nick.empty() && !_user.empty());
 }
 
 void Client::send(std::string msg)

@@ -137,7 +137,7 @@ void Server::on_client_connect(void *event, void *user_data) {
 
 	irc->_clients[evt->client->get_fd()] = client;
 
-	client->send(IRCErrors::welcome_banner());
+	client->send(Errors::welcome_banner());
 
 	std::cout << SKLL_GREEN << "[CONNECT] " << SKLL_RESET
 			  << SKLL_BOLD << evt->client->get_id() << SKLL_RESET

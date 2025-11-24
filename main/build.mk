@@ -32,15 +32,11 @@ MAIN_SRC		=	Irc.cpp
 MAIN_SRC		+=	client.cpp
 MAIN_SRC		+=	channel.cpp
 MAIN_SRC		+=	server.cpp
-MAIN_SRC		+=	cmds/pass.cpp
-MAIN_SRC		+=	cmds/nick.cpp
-MAIN_SRC		+=	cmds/user.cpp
-# MAIN_SRC		+=	IRCCommands.cpp
-# MAIN_SRC		+=	IRCErrors.cpp
+MAIN_SRC		+=	errors.cpp
 
-# MAIN_SRC_CMDS 	=	pass.cpp
-# MAIN_SRC_CMDS 	+=	nick.cpp
-# MAIN_SRC_CMDS 	+=	user.cpp
+MAIN_SRC_CMDS 	=	pass.cpp
+MAIN_SRC_CMDS 	+=	nick.cpp
+MAIN_SRC_CMDS 	+=	user.cpp
 
 MAIN_FILE		=	main.cpp
 
@@ -52,7 +48,7 @@ MAIN_SRC_CMDS_OBJS = $(patsubst $(MAIN_SRC_CMDS_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o,
 MAIN_SRC_OBJS	= $(patsubst $(MAIN_SRC_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_SRC_FILES))
 MAIN_MAIN_OBJ	= $(patsubst $(MAIN_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_MAIN_FILE))
 
-MAIN_OBJS		= $(MAIN_SRC_OBJS) $(MAIN_MAIN_OBJ)
+MAIN_OBJS		= $(MAIN_SRC_OBJS) $(MAIN_MAIN_OBJ) $(MAIN_SRC_CMDS_OBJS)
 
 MAIN_SRC_DEPS	= $(patsubst $(MAIN_SRC_DIR)/%.cpp, $(MAIN_DEP_DIR)/%.d, $(MAIN_SRC_FILES))
 MAIN_MAIN_DEP	= $(patsubst $(MAIN_DIR)/%.cpp, $(MAIN_DEP_DIR)/%.d, $(MAIN_MAIN_FILE))
