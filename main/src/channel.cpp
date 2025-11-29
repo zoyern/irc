@@ -21,23 +21,32 @@ Channel::~Channel() {}
 void Channel::setName(std::string name) { _name = name; }
 void Channel::setPassword(std::string password) { _password = password; }
 void Channel::setTopic(std::string topic) { _topic = topic; }
-void Channel::setSize(int size) { _size = size; }
+void Channel::setLimit(int limit) { _limit = limit; }
+void Channel::setSize(int size) { _limit = size; }
 void Channel::setInviteOnly(bool invOnly) { _inviteOnly = invOnly; }
 void Channel::SetRestrictedTopic(bool restTopic) { _restrictedTopic = restTopic; }
 
 std::string Channel::getName(void) const { return _name; }
+
 std::string Channel::getPassword(void) const { return _password; }
+
 std::string Channel::getTopic(void) const { return _topic; }
-int Channel::getSize(void) const { return _size; }
+
+int Channel::getLimit(void) const { return _limit; }
+
+int Channel::getSize(void) const { return _limit; }
+
 bool Channel::getInviteOnly(void) const { return _inviteOnly; }
+
 bool Channel::getRestrictedTopic(void) const { return _restrictedTopic; }
+
 Client *Channel::getClient(std::string nick)
 {
 	std::vector<Client>::iterator it = _clients.begin();
 	std::vector<Client>::iterator ite = _clients.end();
 	while (it != ite)
 	{
-		if(it->getNick() == nick)
+		if (it->getNick() == nick)
 			return &(*it);
 		it++;
 	}
@@ -49,19 +58,25 @@ Client *Channel::getClient(int fd)
 	std::vector<Client>::iterator ite = _clients.end();
 	while (it != ite)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			return &(*it);
 		it++;
 	}
 	return NULL;
 }
+
+std::vector<Client> Channel::getOperators(void) const
+{
+	return _operators;
+}
+
 Client *Channel::getOperator(int fd)
 {
 	std::vector<Client>::iterator it = _operators.begin();
 	std::vector<Client>::iterator ite = _operators.end();
 	while (it != ite)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			return &(*it);
 		it++;
 	}
@@ -73,11 +88,16 @@ Client *Channel::getInvitedClient(int fd)
 	std::vector<Client>::iterator ite = _operators.end();
 	while (it != ite)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			return &(*it);
 		it++;
 	}
 	return NULL;
+}
+
+std::vector<Client> Channel::getClients(void) const
+{
+	return _clients;
 }
 
 void Channel::addClient(Client &newClient)
@@ -99,19 +119,20 @@ void Channel::addInvitation(Client &newinvited)
 void Channel::removeClient(int fd)
 {
 	std::vector<Client>::iterator it = _clients.begin();
-	for(; it != _clients.end(); it++)
+	for (; it != _clients.end(); it++)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			_clients.erase(it);
 	}
 	removeOperator(fd);
+	removeInvitedClient(fd);
 }
 void Channel::removeOperator(int fd)
 {
 	std::vector<Client>::iterator it = _operators.begin();
-	for(; it != _operators.end(); it++)
+	for (; it != _operators.end(); it++)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			_operators.erase(it);
 	}
 }
@@ -119,9 +140,9 @@ void Channel::removeOperator(int fd)
 void Channel::removeInvitedClient(int fd)
 {
 	std::vector<Client>::iterator it = _clients.begin();
-	for(; it != _clients.end(); it++)
+	for (; it != _clients.end(); it++)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			_clients.erase(it);
 	}
 }
@@ -130,7 +151,7 @@ void Channel::broadcastToOne(int fd, std::string msg)
 {
 	Client *client = getClient(fd);
 	if (client)
-		write(client->getFd(), msg.c_str(), msg.length());
+		client->send(msg);
 }
 
 void Channel::broadcastToAll(std::string msg)
@@ -147,7 +168,7 @@ void Channel::broadcastToAll(int clientFd, std::string msg)
 	{
 		if (it->getFd() == clientFd)
 			continue;
-		write(it->getFd(), msg.c_str(), msg.length());
+		it->send(msg);
 		it++;
 	}
 }

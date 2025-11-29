@@ -1,9 +1,9 @@
 #include "Irc.hpp"
 
-void quit(int fd, std::string reason)
+void quit_cmd(SkllEvent *event, void *user_data)
 {
-	// remove client from all channel
-	// remove client
-	// close client fd
-	// brodcast to all client off the channel
+	Server *server = static_cast<Server *>(user_data);
+	Client *client = (Client *)event->client->userdata;
+
+	server->deleteClient(client->getFd());
 }

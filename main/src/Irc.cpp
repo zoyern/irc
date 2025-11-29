@@ -1,13 +1,16 @@
 #include "Irc.hpp"
 
-void on_signal(void *event, void *user_data) {
-	SkllEvent *evt = (SkllEvent*)event; (void)user_data;
+void on_signal(void *event, void *user_data)
+{
+	SkllEvent *evt = (SkllEvent *)event;
+	(void)user_data;
 	std::cout << SKLL_MAGENTA << "\n[" << irc_timestamp() << "] "
 			  << SKLL_RESET << "Signal " << SKLL_BOLD << evt->signal_num
 			  << SKLL_RESET << " - Graceful shutdown" << std::endl;
 }
 
-std::string irc_timestamp() {
+std::string irc_timestamp()
+{
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 
@@ -40,81 +43,119 @@ std::string irc_timestamp() {
 // 			  << message << std::endl;
 // }
 
-void irc_log_simple(const std::string &event, const std::string &message) {
+void irc_log_simple(const std::string &event, const std::string &message)
+{
 	std::cout << "[" << irc_timestamp() << "]\t"
 			  << std::setw(35) << std::left << "SERVER" << "\t"
 			  << "[" << std::setw(10) << std::left << event << "]\t-> "
 			  << message << std::endl;
 }
 
-void irc_log_command(const std::string &cmd, const std::string &details) {
+void irc_log_command(const std::string &cmd, const std::string &details)
+{
 	std::cout << "[" << irc_timestamp() << "]\t"
 			  << std::setw(35) << std::left << "COMMAND" << "\t"
 			  << "[" << std::setw(10) << std::left << cmd << "]\t-> "
 			  << details << std::endl;
 }
 
-std::string irc_err_nosuchnick(const std::string &nick, const std::string &target) {
+std::string irc_err_nosuchnick(const std::string &nick, const std::string &target)
+{
 	return ":server " ERR_NOSUCHNICK " " + nick + " " + target + " :No such nick/channel\r\n";
 }
 
-std::string irc_err_nosuchchannel(const std::string &nick, const std::string &channel) {
+std::string irc_err_nosuchchannel(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_NOSUCHCHANNEL " " + nick + " " + channel + " :No such channel\r\n";
 }
 
-std::string irc_err_cannotsendtochan(const std::string &nick, const std::string &channel) {
+std::string irc_err_passwdmismatch(const std::string &nick, const std::string &channel)
+{
+	return ":server " ERR_PASSWDMISMATCH " " + nick + " " + channel + " :Incorrect password\r\n";
+}
+
+std::string irc_err_cannotsendtochan(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_CANNOTSENDTOCHAN " " + nick + " " + channel + " :Cannot send to channel\r\n";
 }
 
-std::string irc_err_nonicknamegiven() {
+std::string irc_err_nonicknamegiven()
+{
 	return ":server " ERR_NONICKNAMEGIVEN " * :No nickname given\r\n";
 }
 
-std::string irc_err_nicknameinuse(const std::string &nick) {
+std::string irc_err_nicknameinuse(const std::string &nick)
+{
 	return ":server " ERR_NICKNAMEINUSE " * " + nick + " :Nickname is already in use\r\n";
 }
 
-std::string irc_err_notonchannel(const std::string &nick, const std::string &channel) {
+std::string irc_err_notonchannel(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_NOTONCHANNEL " " + nick + " #" + channel + " :Not on channel\r\n";
 }
 
-std::string irc_err_notregistered(const std::string &nick) {
+std::string irc_err_useronchannel(const std::string &nick, const std::string &channel)
+{
+	return ":server " ERR_USERONCHANNEL " " + nick + " #" + channel + " :Already on channel\r\n";
+}
+
+std::string irc_err_notregistered(const std::string &nick)
+{
 	std::string n = nick.empty() ? "*" : nick;
 	return ":server " ERR_NOTREGISTERED " " + n + " :You have not registered\r\n";
 }
 
-std::string irc_err_needmoreparams(const std::string &nick, const std::string &command) {
+std::string irc_err_needmoreparams(const std::string &nick, const std::string &command)
+{
 	return ":server " ERR_NEEDMOREPARAMS " " + nick + " " + command + " :Not enough parameters\r\n";
 }
 
-std::string irc_err_alreadyregistred(const std::string &nick) {
+std::string irc_err_alreadyregistred(const std::string &nick)
+{
 	return ":server " ERR_ALREADYREGISTRED " " + nick + " :You may not reregister\r\n";
 }
 
-std::string irc_err_channelisfull(const std::string &nick, const std::string &channel) {
+std::string irc_err_channelisfull(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_CHANNELISFULL " " + nick + " #" + channel + " :Channel is full\r\n";
 }
 
-std::string irc_err_inviteonlychan(const std::string &nick, const std::string &channel) {
+std::string irc_err_inviteonlychan(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_INVITEONLYCHAN " " + nick + " #" + channel + " :Invite only\r\n";
 }
 
-std::string irc_err_badchannelkey(const std::string &nick, const std::string &channel) {
+std::string irc_err_badchannelkey(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_BADCHANNELKEY " " + nick + " #" + channel + " :Bad channel key\r\n";
 }
 
-std::string irc_err_chanoprivsneeded(const std::string &nick, const std::string &channel) {
+std::string irc_err_chanoprivsneeded(const std::string &nick, const std::string &channel)
+{
 	return ":server " ERR_CHANOPRIVSNEEDED " " + nick + " #" + channel + " :You're not channel operator\r\n";
 }
 
-std::string irc_err_notexttosend(const std::string &nick) {
+std::string irc_err_notexttosend(const std::string &nick)
+{
 	return ":server 412 " + nick + " :No text to send\r\n";
 }
 
-std::string irc_rpl_welcome(const std::string &nick, const std::string &user, const std::string &host, const std::string &servername) {
+std::string irc_rpl_welcome(const std::string &nick, const std::string &user, const std::string &host, const std::string &servername)
+{
 	return ":server " RPL_WELCOME " " + nick + " :Welcome to " + servername + " " + nick + "!" + user + "@" + host + "\r\n";
 }
 
-std::string irc_rpl_topic(const std::string &nick, const std::string &channel, const std::string &topic) {
+std::string irc_rpl_topic(const std::string &nick, const std::string &channel, const std::string &topic)
+{
 	return ":server " RPL_TOPIC " " + nick + " #" + channel + " :" + topic + "\r\n";
+}
+
+std::string irc_rpl_invite(const std::string &nick, const std::string &invitedNick, const std::string &channel)
+{
+	return ":server " RPL_INVITE " " + nick + "has invited " + invitedNick + " to #" + channel + "\r\n";
+}
+
+std::string irc_rpl_quit(const std::string &nick)
+{
+	return ":server " + nick + " is exiting the network\r\n";
 }

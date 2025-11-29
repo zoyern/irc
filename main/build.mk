@@ -50,10 +50,11 @@ MAIN_MAIN_OBJ	= $(patsubst $(MAIN_DIR)/%.cpp, $(MAIN_OBJ_DIR)/%.o, $(MAIN_MAIN_F
 
 MAIN_OBJS		= $(MAIN_SRC_OBJS) $(MAIN_MAIN_OBJ) $(MAIN_SRC_CMDS_OBJS)
 
+MAIN_SRC_CMDS_DEPS = $(patsubst $(MAIN_SRC_CMDS_DIR)/%.cpp, $(MAIN_DEP_DIR)/%.d, $(MAIN_SRC_CMDS_FILES))
 MAIN_SRC_DEPS	= $(patsubst $(MAIN_SRC_DIR)/%.cpp, $(MAIN_DEP_DIR)/%.d, $(MAIN_SRC_FILES))
 MAIN_MAIN_DEP	= $(patsubst $(MAIN_DIR)/%.cpp, $(MAIN_DEP_DIR)/%.d, $(MAIN_MAIN_FILE))
 
-MAIN_DEPS		= $(MAIN_SRC_DEPS) $(MAIN_MAIN_DEP)
+MAIN_DEPS		= $(MAIN_SRC_DEPS) $(MAIN_MAIN_DEP) $(MAIN_SRC_CMDS_DEPS)
 
 main: lib $(MAIN_NAME)
 
@@ -76,11 +77,20 @@ $(MAIN_OBJ_DIR)/%.o: $(MAIN_SRC_DIR)/%.cpp
 	@$(MAIN_CC) $(MAIN_CFLAGS) $(MAIN_IFLAGS) $(MAIN_DEPFLAGS) \
 		-MF $(MAIN_DEP_DIR)/$*.d -c $< -o $@
 
+$(MAIN_OBJ_DIR)/%.o: $(MAIN_SRC_CMDS_DIR)/%.cpp
+	@mkdir -p $(MAIN_OBJ_DIR)
+	@mkdir -p $(MAIN_DEP_DIR)
+	@echo "$(PURPLE)$(BOLD)→$(RESET) $(ICE)Compiling command $(DIM)$<$(RESET)"
+	@$(MAIN_CC) $(MAIN_CFLAGS) $(MAIN_IFLAGS) $(MAIN_DEPFLAGS) \
+		-MF $(MAIN_DEP_DIR)/$*.d -c $< -o $@
+
+
 $(MAIN_OBJ_DIR)/%.o: $(MAIN_DIR)/%.cpp
 	@mkdir -p $(MAIN_OBJ_DIR)
 	@mkdir -p $(MAIN_DEP_DIR)
 	@echo "$(PURPLE)$(BOLD)→$(RESET) $(ICE)Compiling $(DIM)$<$(RESET)"
 	@$(MAIN_CC) $(MAIN_CFLAGS) $(MAIN_IFLAGS) $(MAIN_DEPFLAGS) \
 		-MF $(MAIN_DEP_DIR)/$*.d -c $< -o $@
+
 
 .PHONY: main

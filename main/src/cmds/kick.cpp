@@ -1,6 +1,6 @@
 #include "Irc.hpp"
 
-bool isSplitkick(std::string cmd, std::string &channelName, std::string &nick, int fd)
+bool isSplitkick(std::string cmd, std::string &channelName, std::string &nick, Client *client)
 {
 	std::istringstream ss(cmd);
 	std::vector<std::string> stringContainer;
@@ -8,57 +8,39 @@ bool isSplitkick(std::string cmd, std::string &channelName, std::string &nick, i
 	while (ss >> token)
 		stringContainer.push_back(token);
 	if (stringContainer.size() < 3)
-		return (write(fd, "ERR_NEEDMOREPARAMS (461)\n", strlen("ERR_NEEDMOREPARAMS (461)\n")), false);
+		return (client->send(irc_err_needmoreparams(client->getNick(), cmd)), false);
 	channelName = stringContainer[1];
 	if (channelName[0] != '#')
-		return (write(fd, "ERR_NOSUCHCHANNEL (403)\n", strlen("ERR_NOSUCHCHANNEL (403)\n")), false);
+		return (client->send(irc_err_nosuchchannel(client->getNick(), channelName)), false);
 	if (stringContainer.size() >= 3)
 		nick = channelName[2];
 	return true;
 }
 
-void Server::kick(std::string cmd, int fd)
+void kick_cmd(SkllEvent *event, void *user_data)
 {
-	std::cout << "CMD = " << cmd << std::endl;
-	Client *op = NULL, *kickedClient = NULL;
+	Server *server = static_cast<Server *>(user_data);
+	Client *client = (Client *)event->client->userdata;
+
+	Client *kickedClient = NULL;
 	Channel *channel;
 	std::string channelName;
 	std::string nick;
-	// Client kicked
-	if(!isSplitkick(cmd, channelName, nick, fd))
+	std::string cmd = event->message->to<std::string>();
+	if (!isSplitkick(cmd, channelName, nick, client))
 		return;
-	std::cout << "Nick = " << nick << " ChannelName " << channelName << std::endl;
-	if(!(channel = getOneChannel(channelName)))
-	{
-		write(fd, "ERR_NOSUCHCHANNEL (403)\n", strlen("ERR_NOSUCHCHANNEL (403)\n"));
-		return;
-	}
-	if(!(op = channel->getClient(fd)))
-	{
-		write(fd, "ERR_NOTONCHANNEL (442)\n", strlen("ERR_NOTONCHANNEL (442)\n"));
-		return;
-	}
-	if(!(op = channel->getOperator(fd)))
-	{
-		write(fd, "ERR_CHANOPRIVSNEEDED (482)\n", strlen("ERR_CHANOPRIVSNEEDED (482)\n"));
-		return;
-	}
-	if(!(kickedClient = getOneClient(nick)))
-	{
-		write(fd, "ERR_NOSUCHNICK (401)\n", strlen("ERR_NOSUCHNICK (401)\n"));
-		return;
-	}
-	if(!(kickedClient = channel->getClient(nick)))
-	{
-		write(fd, "ERR_USERNOTINCHANNEL (401)\n", strlen("ERR_USERNOTINCHANNEL (401)\n"));
-		return;
-	}
+	if (!(channel = server->getOneChannel(channelName)))
+		return (client->send(irc_err_nosuchchannel(client->getNick(), channelName)));
+	if (!(channel->getClient(client->getFd())))
+		return (client->send(irc_err_notonchannel(client->getNick(), channelName)));
+	if (!(channel->getOperator(client->getFd())))
+		return (client->send(irc_err_chanoprivsneeded(client->getNick(), channel->getName())));
+	if (!(kickedClient = server->getOneClient(nick)))
+		return (client->send(irc_err_nosuchnick(client->getNick(), nick)));
+	if (!(channel->getClient(kickedClient->getFd())))
+		return (client->send(irc_err_notonchannel(kickedClient->getNick(), channelName)));
 	channel->removeClient(kickedClient->getFd());
 	channel->broadcastToAll(nick + " kicked from" + "channelName");
-	if(channel->getSize() < 1)
-		deleteChannel(channelName);
-	// verify that the user who write the command is admin
-	// verify that the user who is kicked is in the channel
-
-	// broadcast to all user of the channel exept the user kicked
+	if (channel->getSize() < 1)
+		server->deleteChannel(channelName);
 }

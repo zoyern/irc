@@ -38,6 +38,7 @@
 #define RPL_MYINFO              "004"
 #define RPL_NOTOPIC             "331"
 #define RPL_TOPIC               "332"
+#define RPL_INVITE              "341"
 #define RPL_NAMREPLY            "353"
 #define RPL_ENDOFNAMES          "366"
 #define RPL_MOTD                "372"
@@ -73,9 +74,11 @@ void        irc_log_command(const std::string &cmd, const std::string &details);
 
 std::string irc_err_nosuchnick(const std::string &nick, const std::string &target);
 std::string irc_err_nosuchchannel(const std::string &nick, const std::string &channel);
+std::string irc_err_passwdmismatch(const std::string &nick, const std::string &channel);
 std::string irc_err_cannotsendtochan(const std::string &nick, const std::string &channel);
 std::string irc_err_nonicknamegiven();
 std::string irc_err_nicknameinuse(const std::string &nick);
+std::string irc_err_useronchannel(const std::string &nick, const std::string &channel);
 std::string irc_err_notonchannel(const std::string &nick, const std::string &channel);
 std::string irc_err_notregistered(const std::string &nick);
 std::string irc_err_needmoreparams(const std::string &nick, const std::string &command);
@@ -88,4 +91,6 @@ std::string irc_err_notexttosend(const std::string &nick);
 
 std::string irc_rpl_welcome(const std::string &nick, const std::string &user, const std::string &host, const std::string &servername);
 std::string irc_rpl_topic(const std::string &nick, const std::string &channel, const std::string &topic);
+std::string irc_rpl_invite(const std::string &nick, const std::string &invitedNick, const std::string &channel);
+std::string irc_rpl_quit(const std::string &nick);
 void on_signal(void *event, void *user_data);

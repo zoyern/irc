@@ -24,7 +24,7 @@ private:
 	std::string _password;
 	std::string _topic;
 	// int _operator;
-	int _size;
+	int _limit;
 	bool _inviteOnly;
 	bool _restrictedTopic;
 
@@ -39,6 +39,7 @@ public:
 	void setName(std::string name);
 	void setPassword(std::string password);
 	void setTopic(std::string topic);
+	void setLimit(int limit);
 	// void setOperator(int op);
 	void setSize(int size);
 	void setInviteOnly(bool inv_only);
@@ -48,12 +49,15 @@ public:
 	std::string getName(void) const;
 	std::string getPassword(void) const;
 	std::string getTopic(void) const;
+	int getLimit(void) const;
 	int getSize(void) const;
 	bool getInviteOnly(void) const;
 	bool getRestrictedTopic(void) const;
 	Client *getClient(int fd);
+	std::vector<Client> getClients(void) const;
 	Client *getClient(std::string nick);
 	Client *getOperator(int fd);
+	std::vector<Client> getOperators(void) const;
 	Client *getInvitedClient(int fd);
 
 	// ADD FUNC

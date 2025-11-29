@@ -1,17 +1,14 @@
 #include "Irc.hpp"
 
 Server::Server(void) : _password(""), _name("irc")
-{}
-Server::Server(std::string password) : _password(password)
-{};
+{
+}
 
-Server::Server(const std::string password) : _password(password), _name("irc") {
-
-    _hook.on(SKLL_ON_START, on_server_start, this);
-    _hook.on(SKLL_ON_CONNECT, on_client_connect, this);
-    _hook.on(SKLL_ON_DISCONNECT, on_client_disconnect, this);
-
-    setup_default_channels();
+Server::Server(const std::string password, SkllClient &client) : _password(password), _client(&client)
+{
+	_client->on(SKLL_ON_START, on_server_start, this);
+	_client->on(SKLL_ON_CONNECT, on_client_connect, this);
+	// _client->on(SKLL_ON_DISCONNECT, on_client_disconnect, this);
 }
 
 bool Server::checkPassword(std::string pass)
@@ -28,9 +25,9 @@ Channel *Server::getOneChannel(std::string name)
 {
 	std::vector<Channel>::iterator it = _channels.begin();
 	std::vector<Channel>::iterator ite = _channels.end();
-	while(it != ite)
+	while (it != ite)
 	{
-		if(it->getName() == name)
+		if (it->getName() == name)
 			return &(*it);
 		it++;
 	}
@@ -44,9 +41,9 @@ void Server::deleteChannel(std::string name)
 {
 	std::vector<Channel>::iterator it = _channels.begin();
 	std::vector<Channel>::iterator ite = _channels.end();
-	while(it != ite)
+	while (it != ite)
 	{
-		if(it->getName() == name)
+		if (it->getName() == name)
 			_channels.erase(it);
 		it++;
 	}
@@ -56,21 +53,21 @@ Client *Server::getOneClient(std::string nick)
 {
 	std::vector<Client>::iterator it = _clients.begin();
 	std::vector<Client>::iterator ite = _clients.end();
-	while(it != ite)
+	while (it != ite)
 	{
-		if(it->getNick() == nick)
+		if (it->getNick() == nick)
 			return &(*it);
 		it++;
 	}
 	return NULL;
 }
-Client *Server::getOneClient(int  fd)
+Client *Server::getOneClient(int fd)
 {
 	std::vector<Client>::iterator it = _clients.begin();
 	std::vector<Client>::iterator ite = _clients.end();
-	while(it != ite)
+	while (it != ite)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
 			return &(*it);
 		it++;
 	}
@@ -86,23 +83,61 @@ void Server::addClient(Client &client)
 {
 	_clients.push_back(client);
 }
+
+void Server::broadcastClientQuitMessage(std::string nick, std::map<int, Client> &clientNotTobroadcast, Channel channel)
+{
+	std::vector<Client>::iterator clientIt = channel.getClients().begin();
+	std::vector<Client>::iterator clientIte = channel.getClients().end();
+	std::map<int, Client>::iterator it;
+	while (clientIt != clientIte)
+	{
+		it = clientNotTobroadcast.find(clientIt->getFd());
+		if (it != clientNotTobroadcast.end() && clientIt->getNick() != nick)
+		{
+			clientNotTobroadcast[clientIt->getFd()] = *clientIt;
+			channel.broadcastToOne(clientIt->getFd(), irc_rpl_quit(nick));
+		}
+		clientIt++;
+	}
+}
+
 void Server::deleteClient(int fd)
 {
+	std::vector<Channel>::iterator channelIt = _channels.begin();
+	std::vector<Channel>::iterator channelIte = _channels.end();
+	Client *client = getOneClient(fd);
+	std::map<int, Client> clientNotTobroadcast;
+	while (channelIt != channelIte)
+	{
+		if (channelIt->getClient(fd))
+		{
+			broadcastClientQuitMessage(client->getNick(), clientNotTobroadcast, *channelIt);
+			channelIt->removeClient(fd);
+		}
+		if (channelIt->getClients().size() < 1)
+			deleteChannel(channelIt->getName());
+		channelIt++;
+	}
 	std::vector<Client>::iterator it = _clients.begin();
 	std::vector<Client>::iterator ite = _clients.end();
-	while(it != ite)
+	while (it != ite)
 	{
-		if(it->getFd() == fd)
+		if (it->getFd() == fd)
+		{
+			close(fd);
 			_clients.erase(it);
+		}
 		it++;
 	}
 }
 
-void Server::on_server_start(void *event, void *user_data) {
-	SkllEvent *evt = (SkllEvent*)event;
-	Server *irc = (Server*)user_data;
+void Server::on_server_start(void *event, void *user_data)
+{
+	SkllEvent *evt = (SkllEvent *)event;
+	Server *irc = (Server *)user_data;
 
-	if (!evt->server) return;
+	if (!evt->server)
+		return;
 
 	SkllServer *server = evt->server;
 
@@ -121,21 +156,25 @@ void Server::on_server_start(void *event, void *user_data) {
 			  << SKLL_DIM << (irc->_password.empty() ? "none" : "***")
 			  << SKLL_RESET << SKLL_CYAN << "                       \n"
 			  << "╚════════════════════════════════════════╝"
-			  << SKLL_RESET << "\n" << std::endl;
+			  << SKLL_RESET << "\n"
+			  << std::endl;
 }
 
-void Server::on_client_connect(void *event, void *user_data) {
-	SkllEvent *evt = (SkllEvent*)event;
-	Server *irc = (Server*)user_data;
+void Server::on_client_connect(void *event, void *user_data)
+{
+	SkllEvent *evt = (SkllEvent *)event;
+	Server *irc = (Server *)user_data;
 
-	if (!evt->client) return;
+	if (!evt->client)
+		return;
 
 	evt->client->set_rate_limit(10, 1);
 
-	Client *client = new Client(evt->client);
+	// Client *client = new Client(evt->client);
+	Client *client = new Client(evt->client->get_fd());
 	evt->client->userdata = client;
 
-	irc->_clients[evt->client->get_fd()] = client;
+	irc->addClient(*client);
 
 	client->send(Errors::welcome_banner());
 
@@ -144,36 +183,43 @@ void Server::on_client_connect(void *event, void *user_data) {
 			  << " (fd=" << evt->client->get_fd() << ")" << std::endl;
 }
 
-void Server::on_client_disconnect(void *event, void *user_data) {
-	SkllEvent *evt = (SkllEvent*)event;
-	Server *irc = (Server*)user_data;
+// void Server::on_client_disconnect(void *event, void *user_data)
+// {
+// 	SkllEvent *evt = (SkllEvent *)event;
+// 	Server *irc = (Server *)user_data;
 
-	if (!evt->client) return;
+// 	if (!evt->client)
+// 		return;
 
-	Client *client = (Client*)evt->client->userdata;
-	if (client) {
-		std::ostringstream quit_msg;
-		quit_msg << ":" << client->nickname << "!" << client->username << "@" << client->hostname
-				 << " QUIT :Connection lost\r\n";
+// 	Client *client = (Client *)evt->client->userdata;
+// 	if (client)
+// 	{
+// 		std::ostringstream quit_msg;
+// 		quit_msg << ":" << client->nickname << "!" << client->username << "@" << client->hostname
+// 				 << " QUIT :Connection lost\r\n";
 
-		std::set<std::string>::iterator it;
-		for (it = client->channels.begin(); it != client->channels.end(); ++it) {
-			IRCChannel *channel = irc->get_channel(*it);
-			if (channel) {
-				channel->broadcast(quit_msg.str(), client->get_fd());
-			}
-		}
+// 		std::set<std::string>::iterator it;
+// 		for (it = client->channels.begin(); it != client->channels.end(); ++it)
+// 		{
+// 			IRCChannel *channel = irc->get_channel(*it);
+// 			if (channel)
+// 			{
+// 				channel->broadcast(quit_msg.str(), client->get_fd());
+// 			}
+// 		}
 
-		std::cout << SKLL_RED << "[DISCONNECT] " << SKLL_RESET;
+// 		std::cout << SKLL_RED << "[DISCONNECT] " << SKLL_RESET;
 
-		if (!client->nickname.empty()) {
-			std::cout << SKLL_BOLD << client->nickname << SKLL_RESET << " ";
-		}
+// 		if (!client->nickname.empty())
+// 		{
+// 			std::cout << SKLL_BOLD << client->nickname << SKLL_RESET << " ";
+// 		}
 
-		std::cout << "(" << evt->client->get_id() << ")" << std::endl;
-	}
+// 		std::cout << "(" << evt->client->get_id() << ")" << std::endl;
+// 	}
 
-	irc->remove_client(evt->client->get_fd());
-}
+// 	irc->remove_client(evt->client->get_fd());
+// }
 Server::~Server()
-{}
+{
+}

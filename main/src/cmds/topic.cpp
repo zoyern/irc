@@ -1,6 +1,6 @@
 #include "Irc.hpp"
 
-bool isSplitTopic(std::string cmd, std::string &channelName, std::string &topic, int fd)
+bool isSplitTopic(std::string cmd, std::string &channelName, std::string &topic, Client *client)
 {
 	std::istringstream ss(cmd);
 	std::vector<std::string> stringContainer;
@@ -8,15 +8,15 @@ bool isSplitTopic(std::string cmd, std::string &channelName, std::string &topic,
 	while (ss >> token)
 		stringContainer.push_back(token);
 	if (stringContainer.size() < 2)
-		return (write(fd, "ERR_NEEDMOREPARAMS (461)\n", strlen("ERR_NEEDMOREPARAMS (461)\n")), false);
+		return (client->send(irc_err_needmoreparams(client->getNick(), cmd)), false);
 	channelName = stringContainer[1];
 	if (channelName[0] != '#')
-		return (write(fd, "ERR_NOSUCHCHANNEL (403)\n", strlen("ERR_NOSUCHCHANNEL (403)\n")), false);
+		return (client->send(irc_err_nosuchchannel(client->getNick(), channelName)), false);
 	if (stringContainer.size() >= 3)
 	{
-		for(int i = 2; i < stringContainer.size(); ++i)
+		for (int i = 2; i < stringContainer.size(); ++i)
 		{
-			if(i != 2)
+			if (i != 2)
 				topic += ' ';
 			topic += stringContainer[i];
 		}
@@ -26,46 +26,32 @@ bool isSplitTopic(std::string cmd, std::string &channelName, std::string &topic,
 
 void changeTopic(Channel *channel, Client *client, std::string topic)
 {
-	if(!channel->getRestrictedTopic())
+	if (!channel->getRestrictedTopic())
 		channel->setTopic(topic);
-	else if(channel->getOperator(client->getFd()))
+	else if (channel->getOperator(client->getFd()))
 		channel->setTopic(topic);
 	else
-	{
-		write(client->getFd(), "ERR_CHANOPRIVSNEEDED (403)\n", strlen("ERR_CHANOPRIVSNEEDED (403)\n"));
-		return;
-	}
+		return (client->send(irc_err_chanoprivsneeded(client->getNick(), channel->getName())));
 }
 
-void Server::topic(std::string cmd, int fd)
+void topic_cmd(SkllEvent *event, void *user_data)
 {
+	Server *server = static_cast<Server *>(user_data);
+	Client *client = (Client *)event->client->userdata;
 	std::string channelName;
-	std::string topic;
 	Channel *channel = NULL;
-	Client *client = NULL;
-	if (!(client = getOneClient(fd)))
-	{
-		write(fd, "ERR_NOTONCHANNEL\n", strlen("ERR_NOTONCHANNEL\n"));
+	std::string topic;
+	std::string cmd = event->message->to<std::string>();
+	if (!isSplitTopic(cmd, channelName, topic, client))
 		return;
-	}
-	if (!isSplitTopic(cmd, channelName, topic, fd))
-		return;
-	if (!(channel = getOneChannel(channelName)))
-	{
-		write(fd, "ERR_NOSUCHCHANNEL (403)\n", strlen("ERR_NOSUCHCHANNEL (403)\n"));
-		return;
-	}
+	if (!(channel = server->getOneChannel(channelName)))
+		return (client->send(irc_err_nosuchchannel(client->getNick(), channelName)));
 	if (topic.empty())
 	{
 		std::string res = "No topic is set\n";
 		if (!channel->getTopic().empty())
-			res = "topic is " + channel->getTopic();
-		write(fd, res.c_str(), strlen(res.c_str()));
+			res = channel->getTopic();
+		return (client->send(irc_rpl_topic(client->getNick(), channelName, res)));
 	}
 	changeTopic(channel, client, topic);
-	// verify if channel exist
-	// verify if user is in channel
-	// verify topic restriction
-	// then change topic name
-	// broadcast to all user of the channel
 }

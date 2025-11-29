@@ -19,7 +19,7 @@ class Server
 {
 public:
 	Server(void);
-	Server(std::string password);
+	Server(const std::string password, SkllClient &client);
 	Channel *getOneChannel(std::string name);
 	const std::vector<Channel> &getChannels() const;
 	void addChannel(Channel &channel);
@@ -30,15 +30,16 @@ public:
 	void addClient(Client &client);
 	void deleteClient(int fd);
 	bool checkPassword(std::string pass);
+	void Server::broadcastClientQuitMessage(std::string nick, std::map<int, Client> &clientTobroadcast, Channel channel);
 	~Server();
 	static void on_server_start(void *event, void *user_data);
 	static void on_client_connect(void *event, void *user_data);
-	static void on_client_disconnect(void *event, void *user_data);
+	// static void on_client_disconnect(void *event, void *user_data);
 
 private:
 	std::string _password;
 	std::string _name;
 	std::vector<Channel> _channels;
 	std::vector<Client> _clients;
-	std::vector<Client> _ncClients;
+	SkllClient *_client;
 };

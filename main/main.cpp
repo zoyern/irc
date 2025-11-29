@@ -21,11 +21,11 @@
 
 int main(int argc, char **argv) {
 	if (argc != 3) return (std::cerr << "Usage: " << argv[0] << " <port> <password>" << std::endl, 1);
-
 	int port = std::atoi(argv[1]); std::string password = argv[2];
 	if (port < 1024 || port > 65535) return (std::cerr << "Error: Port must be between 1024-65535" << std::endl, 1);
 	try {
-		Server		irc_server(password);
+		SkllClient skllClient;
+		Server		irc_server(password, skllClient);
 		SkllServer		server(IRC_MAX_CLIENT);
 		SkllProtocol	irc_tcp("irc", "0.0.0.0", port, SKLL_TCP | SKLL_IPV4);
 		SkllNetwork		network("irc_network", IRC_TIMEOUT, IRC_QUEUE_EVENT);
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 					.set_keepalive(true)
 					.set_chunk_size(4096)
 					.on(SKLL_ON_CONNECT, Server::on_client_connect, &irc_server)
-					.on(SKLL_ON_DISCONNECT, Server::on_client_disconnect, &irc_server)
+					// .on(SKLL_ON_DISCONNECT, Server::on_client_disconnect, &irc_server)
 					.router()
 						.delim(IRC_CRLF, "\r\n")
 						.delim(IRC_LF, "\n")
