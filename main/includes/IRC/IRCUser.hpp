@@ -11,22 +11,35 @@
 /* ************************************************************************** */
 
 #pragma once
+#include <IRC.hpp>
 
-# include <Sockell/SkllTypes.hpp>
-# include <string>
+class IRCUser
+{
+public:
+	IRCUser(void);
+	IRCUser(int fd);
+	IRCUser(std::string p, std::string n, std::string u);
+	IRCUser(IRCUser const &IRCUser);
+	IRCUser &operator=(IRCUser const &IRCUser);
+	void setUser(std::string user);
+	void setFd(int fd);
+	void setNick(std::string nick);
+	void setPass(std::string pass);
+	void setBuffer(std::string buf);
+	void clearBuffer(void);
+	std::string getUser(void) const;
+	std::string getNick(void) const;
+	std::string getPass(void) const;
+	int getFd(void) const;
+	std::string getBuffer(void) const;
+	bool isAuth();
+	void send(std::string msg);
+	~IRCUser();
 
-/* ═══════════════════════════════════════════════════════════════════════════ */
-/*   IRC USER - Simple POD structure for user state                            */
-/* ═══════════════════════════════════════════════════════════════════════════ */
-
-struct IRCUser {
-	fd_t        fd;
-	std::string nick;
-	std::string user;
-	std::string realname;
-	std::string host;
-	bool        pass_ok;
-	bool        registered;
-
-	IRCUser() : fd(-1), pass_ok(false), registered(false) {}
+private:
+	std::string _pass;
+	std::string _nick;
+	std::string _user;
+	std::string _buffer;
+	int _fd;
 };

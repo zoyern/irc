@@ -28,7 +28,7 @@ MAIN_DEPFLAGS	= -MMD -MP
 
 MAIN_FILE		=	main.cpp
 
-MAIN_SRC		=	IRCServer.cpp
+MAIN_SRC		=	IRCServer.cpp IRCChannel.cpp IRCUser.cpp
 
 MAIN_SRC_FILES	= $(addprefix $(MAIN_SRC_DIR)/, $(MAIN_SRC))
 MAIN_MAIN_FILE	= $(addprefix $(MAIN_DIR)/, $(MAIN_FILE))

@@ -5,60 +5,95 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/23 02:09:32 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/23 02:09:32 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/03 22:31:36 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/03 22:31:36 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+#include <IRC.hpp>
 
-#include <IRCServer.hpp>
-#include <iostream>
-#include <cstdlib>
+bool checkPort(std::string strPort)
+{
+	if (strPort.find_first_not_of("0123456789") != std::string::npos)
+		return (std::cerr << RED << "Error: port must only contain numbers" << RESET << std::endl, false);
+	int port = std::atoi(strPort.c_str());
+	if (port < 1024 || port > 65535)
+		return (std::cerr << RED << "Error: Port must be between 1024-65535" << RESET << std::endl, false);
+	return true;
+}
+std::vector<std::string> splitCmdLine(std::string str)
+{
+	std::vector<std::string> cmds;
+	std::istringstream stm(str);
+	std::string line;
+	while (std::getline(stm, line))
+	{
+		size_t pos = line.find_first_of("\r\n");
+		if (pos != std::string::npos)
+			line = line.substr(0, pos);
+		cmds.push_back(line);
+	}
+	return cmds;
+}
+std::vector<std::string> splitCmd(std::string input)
+{
+	std::vector<std::string> out;
+	std::string commandLine = input;
 
-static void usage(const char *prog) {
-	std::cout << "Usage: " << prog << " <port> <password>" << std::endl;
-	std::cout << std::endl;
-	std::cout << "Arguments:" << std::endl;
-	std::cout << "  port      Port number (1024-65535)" << std::endl;
-	std::cout << "  password  Server password (required for all clients)" << std::endl;
-	std::cout << std::endl;
-	std::cout << "Examples:" << std::endl;
-	std::cout << "  " << prog << " 6667 secret123" << std::endl;
-	std::cout << "  " << prog << " 6697 mypassword" << std::endl;
-	std::cout << std::endl;
-	std::cout << "Testing:" << std::endl;
-	std::cout << "  nc -C localhost 6667          # Manual test with netcat" << std::endl;
-	std::cout << "  python3 test_all.py 6667 secret123  # Automated tests" << std::endl;
+	std::istringstream ss(commandLine);
+	std::string token;
+
+	if (!(ss >> token))
+		return out;
+
+	for (int i = 0; token[i]; ++i)
+	{
+		token[i] = std::tolower(static_cast<unsigned char>(token[i]));
+	}
+
+	out.push_back(token);
+
+	while (ss >> token)
+		out.push_back(token);
+
+	return out;
 }
 
-int main(int argc, char ** argv) {
-	if (argc != 3) {
-		usage(argv[0]);
+int main(int ac, char **av)
+{
+	if (ac != 3)
+		return (std::cout << RED << "Usage: ./ircserv <port> <password>" << RESET << std::endl, EXIT_FAILURE);
+	if (!checkPort(av[1]))
 		return 1;
+	IRCServer server(std::atoi(av[1]), av[2]);
+	try
+	{
+		server.run();
 	}
-
-	/* Validate port */
-	int port = std::atoi(argv[1]);
-	if (port < 1024 || port > 65535) {
-		std::cerr << "Error: Port must be between 1024 and 65535" << std::endl;
-		return 1;
+	catch (const std::exception &e)
+	{
+		std::cerr << e.what() << '\n';
 	}
-
-	/* Validate password */
-	std::string password = argv[2];
-	if (password.empty()) {
-		std::cerr << "Error: Password cannot be empty" << std::endl;
-		return 1;
-	}
-
-	/* Start server */
-	try {
-		IRCServer server(port, password);
-		server.start();
-	} catch (const std::exception &e) {
-		std::cerr << "Fatal error: " << e.what() << std::endl;
-		return 1;
-	}
-
+	std::cout << "Server closed !" << std::endl;
 	return 0;
 }
+/*
+int main(int ac, char **av)
+{
+	if (ac != 3)
+		return (std::cout << RED << "Usage: ./ircserv <port> <password>" << RESET << std::endl, EXIT_FAILURE);
+	if (!checkPort(av[1]))
+		return 1;
+	Server server(std::atoi(av[1]), av[2]);
+	try
+	{
+		// handle Signals 
+		server.initServer();
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << e.what() << '\n';
+	}
+	std::cout << "Server closed !" << std::endl;
+	return 0;
+}*/ 
