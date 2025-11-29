@@ -11,36 +11,54 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllTypes.hpp>
 #include <string>
+#include <set>
 #include <map>
-#include <cstddef>
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   CHANNEL - Generic group/room with custom permissions                      */
+/*   • Permissions defined by CLIENT                                           */
+/*   • Groups of permissions (operator, viewer, etc.) defined by client        */
+/*   • Members tracked by fd                                                   */
+/*   • Copyable (stored in std::map by value, no heap allocation)              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
-class SkllClient;
+class SkllChannel
+{
+	private:
+		std::string							_name;
+		std::set<fd_t>						_members;
+		std::map<fd_t, size_t>				_perms;
+		std::map<std::string, std::string>	_meta;
 
-class SkllChannel {
+		static std::string					_empty;
 	public:
-		std::string	name;
-		SkllHook	hook;
-		void		*userdata;
-
-		std::map<int, SkllClient*>	clients;
-		
 		~SkllChannel();
 		SkllChannel();
-		SkllChannel(const std::string &n);
+		SkllChannel(const std::string &name);
+		SkllChannel(const SkllChannel &other);
+		SkllChannel	&operator=(const SkllChannel &other);
 
-		void broadcast(const std::string &msg, int exclude_fd);
-		
-		SkllChannel	&on(int event, SkllHook::Callback cb, void *user_data = NULL);
-		
-		void		add_client(int fd, SkllClient *client);
-		void		remove_client(int fd);
-		SkllClient	*get_client(int fd);
-		bool		has_client(int fd) const;
-		size_t		client_count() const;
+		void						clear();
+		bool						add(fd_t fd, size_t perms = 0);
+		void						set_name(const std::string &name);
+		void						remove(fd_t fd);
 
-	private:
-		SkllChannel(const SkllChannel&);
-		SkllChannel	&operator=(const SkllChannel&);
+		void						set_perms(fd_t fd, size_t p);
+		void						add_perms(fd_t fd, size_t p);
+		void						del_perms(fd_t fd, size_t p);
+
+		void						del(const std::string &key);
+		void						set(const std::string &key, const std::string &val);
+
+		bool						empty() const;
+		bool						has(fd_t fd) const;
+		bool						has(const std::string &key) const;
+		bool						has_perm(fd_t fd, size_t p) const;
+		size_t						count() const;
+		size_t						perms(fd_t fd) const;
+		const std::set<fd_t>		&members() const;
+		const std::string			&name() const;
+		const std::string			&get(const std::string &key) const;
 };
+

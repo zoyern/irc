@@ -10,80 +10,160 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
-#include <Sockell/SkllHook.hpp>
-#include <Sockell/SkllEvent.hpp>
-#include <Sockell/SkllProtocol.hpp>
-#include <Sockell/SkllSignals.hpp>
-#include <sys/epoll.h>
-#include <string>
-#include <vector>
-#include <map>
 
-class SkllServer;
+#pragma once
+
+#include <Sockell/SkllTypes.hpp>
+#include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllRouter.hpp>
+#include <Sockell/SkllProtocol.hpp>
+#include <Sockell/SkllClient.hpp>
+#include <string>
+#include <map>
+#include <deque>
+#include <vector>
+#include <ctime>
+#include <sys/epoll.h>
+
+class SkllServer; /* Forward declaration */
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   DEFAULTS (can be overridden via set_* methods)                            */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+#define SKLL_DEFAULT_MAX_EVENTS		1024
+#define SKLL_DEFAULT_CONN_WINDOW	60
+#define SKLL_DEFAULT_MSG_WINDOW		1
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   RATE LIMIT - Protection against DDoS and flooding                         */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+struct SkllRateLimit {
+	size_t			count;          /* Number of events in window       */
+	time_t			window_start;   /* Start of current window          */
+	
+	SkllRateLimit() : count(0), window_start(0) {}
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   NETWORK - epoll wrapper with protocols and clients                        */
+/*   • Each network has its own epoll                                          */
+/*   • Can handle multiple protocols (TCP, UDP) on same network                */
+/*   • Clients stored in map (fd -> client), NO FIXED LIMIT                    */
+/*   • Built-in rate limiting per IP and per client                            */
+/*   • Dynamic event buffer (no fixed array)                                   */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 class SkllNetwork {
-private:
-	int _epfd;
-	int _signal_fd;
-	std::string _name;
-	int _timeout;
-	int _queue;
-	uint32_t _events;
-	
-	bool _started;
-	bool _running;
-	bool _stopped;
-	
-	SkllServer *_server;
-	
-	std::vector<epoll_event> _ev;
-	std::map<std::string, SkllProtocol*> _protocols;
-	std::map<int, SkllProtocol*> _fd_to_protocol;
-	
-	SkllHook _hook;
-
 public:
 	SkllNetwork();
-	SkllNetwork(const std::string &name, int timeout = 100, int queue = 128);
+	SkllNetwork(const std::string &name);
 	~SkllNetwork();
+
+	/* Configuration */
+	SkllNetwork &				set_name(const std::string &name);
+	SkllNetwork &				set_timeout(int ms);
+	SkllNetwork &				set_delim(const std::string &d);
+	SkllNetwork &				set_max_events(size_t n);
+	void						set_server(SkllServer *s);
+	void						disconnect(SkllEvent &e);
+
+	/* Getters */
+	const std::string &			name() const;
+	int							timeout() const;
+	const std::string &			delim() const;
+	size_t						max_events() const;
+	fd_t						epoll_fd() const;
+	SkllServer *				server();
+
+	/* Protocol management */
+	SkllNetwork &				add(SkllProtocol &proto);
+	size_t						protocol_count() const;
+
+	/* Client management - O(log n) operations */
+	SkllClient &				add_client(fd_t fd);
+	SkllClient *				get_client(fd_t fd);
+	void						remove_client(fd_t fd);
+	size_t						client_count() const;
 	
-	int start();
-	int run();
-	int stop();
-	int shutdown();
+	/* Typed client data access - NO CAST NEEDED */
+	template<typename T>
+	T *client_data(fd_t fd) {
+		SkllClient *c = get_client(fd);
+		return c ? static_cast<T*>(c->raw_data()) : 0;
+	}
+
+	/* Rate limiting */
+	SkllNetwork &				set_conn_limit(size_t max_per_ip, int window_sec);
+	SkllNetwork &				set_msg_limit(size_t max_per_client, int window_sec);
+	bool						check_conn_rate(const std::string &ip);
+	bool						check_msg_rate(fd_t fd);
+	void						clear_rate_limits();
+
+	/* Iteration */
+	std::map<fd_t, SkllClient> &		clients();
+	const std::map<fd_t, SkllClient> &	clients() const;
+
+	/* Event hooks */
+	SkllNetwork &				on(int type, SkllCallback fn);
 	
-	SkllNetwork &on(int event, SkllHook::Callback callback, void *user_data = NULL);
+	/* Typed callback with user data - NO CAST NEEDED */
+	template<typename T>
+	SkllNetwork &				on(int type, int (*fn)(SkllEvent &, T *), T *data) {
+		hooks(type).add(fn, data);
+		return *this;
+	}
 	
-	void set_server(SkllServer *server);
-	SkllServer *get_server() const;
-	
-	SkllProtocol &listen(SkllProtocol &protocol);
-	void remove_protocol(SkllProtocol *protocol);
-	SkllProtocol *get_protocol(const std::string &name);
-	SkllProtocol *get_protocol(int fd);
-	
-	const std::map<std::string, SkllProtocol*> &get_protocols() const;
-	
-	void add_to_epoll(int fd, uint32_t events);
-	void remove_from_epoll(int fd);
-	
-	void update();
-	
-	int get_epoll_fd() const;
-	const std::string &get_name() const;
-	bool is_started() const;
-	bool is_running() const;
+	SkllHooks &					hooks(int type);
+
+	/* Router */
+	SkllRouter &				router();
+
+	/* Lifecycle */
+	bool						init();
+	void						close();
+
+	/* Event loop step (called by server) */
+	int							poll_once();
 
 private:
-	void setup_signals();
-	void handle_event(int fd, uint32_t events);
-	void handle_accept(int listen_fd);
-	void handle_client_data(int client_fd);
-	void handle_signal();
-	void trigger_event(int type, SkllProtocol *proto = NULL, int error = 0);
-	void print_startup_info();
+	SkllServer *				_server;
+	std::string					_name;
+	int							_timeout;
+	std::string					_delim;
+	fd_t						_epoll_fd;
+	size_t						_max_events;
+
+	/* Dynamic event buffer - NO FIXED LIMIT */
+	std::vector<struct epoll_event>		_events;
+
+	std::deque<SkllProtocol *>			_protocols;
+	std::map<fd_t, SkllClient>			_clients;
+	std::map<fd_t, SkllProtocol *>		_listen_fds;
+
+	SkllRouter					_router;
+	SkllHooks					_on_accept;
+	SkllHooks					_on_close;
+	SkllHooks					_on_message;
+	SkllHooks					_on_error;
+
+	/* Rate limiting */
+	std::map<std::string, SkllRateLimit>	_conn_rates;  /* IP -> rate    */
+	std::map<fd_t, SkllRateLimit>			_msg_rates;   /* fd -> rate    */
+	size_t									_conn_limit;  /* Max conn/IP   */
+	int										_conn_window; /* Window (sec)  */
+	size_t									_msg_limit;   /* Max msg/client*/
+	int										_msg_window;  /* Window (sec)  */
+
+	void						_handle_accept(SkllProtocol &proto);
+	void						_handle_read(fd_t fd);
+	void						_handle_udp_read(SkllProtocol &proto);
+	void						_handle_close(fd_t fd);
 	
-	SkllNetwork(const SkllNetwork&);
-	SkllNetwork &operator=(const SkllNetwork&);
+	/* Track which protocol each fd belongs to */
+	std::map<fd_t, SkllProtocol *>		_fd_to_proto;
+
+	SkllNetwork(const SkllNetwork &);
+	SkllNetwork &operator=(const SkllNetwork &);
 };

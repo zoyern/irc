@@ -5,15 +5,15 @@
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/09 17:04:16 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/09 17:04:16 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/27 15:27:42 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/27 15:27:42 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
+
 #include <Sockell/SkllProtocol.hpp>
-#include <Sockell/SkllNetwork.hpp>
-#include <Sockell/SkllErrors.hpp>
-#include <Sockell.hpp>
+#include <Sockell/SkllException.hpp>
+#include <Sockell/SkllLog.hpp>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -21,281 +21,116 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-#include <iostream>
-
-SkllProtocolOptions::SkllProtocolOptions()
-    : reuse_addr(true), reuse_port(false)
-    , send_buf_size(0), recv_buf_size(0)
-    , send_timeout(0), recv_timeout(0)
-    , buffer_size(8192), chunk_size(4096) {}
-
-SkllProtocolTCPOptions::SkllProtocolTCPOptions()
-    : nodelay(true), cork(false), quickack(false), keepalive(true)
-    , keepalive_time(7200), keepalive_intvl(75), keepalive_probes(9) {}
+#include <sstream>
 
 SkllProtocol::SkllProtocol()
-    : _fd(-1), _name(""), _addr(""), _port(0), _opts(0)
-    , _started(false), _running(false), _stopped(false)
-    , _network(NULL) {}
+	: _flags(SKLL_TCP | SKLL_IPV4), _port(0), _host("0.0.0.0")
+	, _reuseaddr(true), _nodelay(false), _keepalive(false)
+	, _backlog(128), _fd(-1) {}
 
-SkllProtocol::SkllProtocol(const std::string &name, const std::string &addr, int port, int opts)
-    : _fd(-1), _name(name), _addr(addr), _port(port), _opts(opts)
-    , _started(false), _running(false), _stopped(false)
-    , _network(NULL) {}
+SkllProtocol::SkllProtocol(int flags, int port)
+	: _flags(flags), _port(port), _host("0.0.0.0")
+	, _reuseaddr(true), _nodelay(false), _keepalive(false)
+	, _backlog(128), _fd(-1) {}
 
-SkllProtocol::~SkllProtocol() {
-    shutdown();
-}
+SkllProtocol::~SkllProtocol() { close(); }
 
-int SkllProtocol::start() {
-	if (_started) return 0;
-	int family = (_opts  &SKLL_IPV6) ? AF_INET6 : AF_INET;
-	int type = (_opts  &SKLL_UDP) ? SOCK_DGRAM : SOCK_STREAM;
-	_fd = socket(family, type, 0);
-	if (_fd < 0) throw SkllErrorSocket("socket() failed");
-	apply_socket_options();
-	_started = true;
-	trigger_event(SKLL_ON_START);
-	return 0;
-}
+SkllProtocol &SkllProtocol::set_flags(int f) { _flags = f; return *this; }
+SkllProtocol &SkllProtocol::set_port(int p) { _port = p; return *this; }
+SkllProtocol &SkllProtocol::set_host(const std::string &h) { _host = h; return *this; }
+SkllProtocol &SkllProtocol::set_reuseaddr(bool v) { _reuseaddr = v; return *this; }
+SkllProtocol &SkllProtocol::set_nodelay(bool v) { _nodelay = v; return *this; }
+SkllProtocol &SkllProtocol::set_keepalive(bool v) { _keepalive = v; return *this; }
+SkllProtocol &SkllProtocol::set_backlog(int b) { _backlog = b; return *this; }
 
-int SkllProtocol::run() {
-	if (!_started) start();
-	if (_running) return 0;
-	bind_and_listen();
-	_running = true;
-	return 0;
-}
+int SkllProtocol::flags() const { return _flags; }
+int SkllProtocol::port() const { return _port; }
+const std::string &SkllProtocol::host() const { return _host; }
+bool SkllProtocol::reuseaddr() const { return _reuseaddr; }
+bool SkllProtocol::nodelay() const { return _nodelay; }
+bool SkllProtocol::keepalive() const { return _keepalive; }
+int SkllProtocol::backlog() const { return _backlog; }
+fd_t SkllProtocol::fd() const { return _fd; }
 
-int SkllProtocol::stop() {
-    if (!_running || _stopped) return 0;
-    
-    _stopped = true;
-    _running = false;
-    
-    trigger_event(SKLL_ON_STOP);
-    
-    return 0;
-}
+bool SkllProtocol::is_tcp() const { return (_flags &SKLL_TCP) != 0; }
+bool SkllProtocol::is_udp() const { return (_flags &SKLL_UDP) != 0; }
+bool SkllProtocol::is_ipv4() const { return (_flags &SKLL_IPV4) != 0; }
+bool SkllProtocol::is_ipv6() const { return (_flags &SKLL_IPV6) != 0; }
+bool SkllProtocol::bound() const { return _fd >= 0; }
 
-int SkllProtocol::shutdown() {
-    if (_fd < 0) return 0;
-    
-    _clients.clear();
-    
-    if (_fd >= 0) {
-        close(_fd);
-        _fd = -1;
-    }
-    
-    _network = NULL;
-    _started = false;
-    _running = false;
-    _stopped = true;
-    
-    trigger_event(SKLL_ON_SHUTDOWN);
-    
-    return 0;
-}
-
-void SkllProtocol::bind_and_listen() {
-    if (_opts  &SKLL_IPV6) {
-        sockaddr_in6 addr;
-        std::memset(&addr, 0, sizeof(addr));
-        addr.sin6_family = AF_INET6;
-        addr.sin6_port = htons(_port);
-        if (_addr == "0.0.0.0" || _addr.empty()) {
-            addr.sin6_addr = in6addr_any;
-        } else {
-            inet_pton(AF_INET6, _addr.c_str(), &addr.sin6_addr);
-        }
-        
-        if (bind(_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-            throw SkllErrorBind("bind() failed");
-        }
-    } else {
-        sockaddr_in addr;
-        std::memset(&addr, 0, sizeof(addr));
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(_port);
-        if (_addr == "0.0.0.0" || _addr.empty()) {
-            addr.sin_addr.s_addr = INADDR_ANY;
-        } else {
-            inet_pton(AF_INET, _addr.c_str(), &addr.sin_addr);
-        }
-        
-        if (bind(_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-            throw SkllErrorBind("bind() failed");
-        }
-    }
-    
-    if (_opts  &SKLL_TCP) {
-        if (listen(_fd, 128) < 0) {
-            throw SkllErrorListen("listen() failed");
-        }
-    }
-    
-    fcntl(_fd, F_SETFL, O_NONBLOCK);
-}
-
-void SkllProtocol::apply_socket_options() {
-	if (_fd < 0) return;
+bool SkllProtocol::bind() {
+	/* Validate port */
+	if (_port < 1 || _port > 65535)
+		throw SkllPortException();
 	
-	int val = _options.reuse_addr ? 1 : 0;
-	setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+	int domain = is_ipv6() ? AF_INET6 : AF_INET;
+	int type = is_udp() ? SOCK_DGRAM : SOCK_STREAM;
 	
-	val = _options.reuse_port ? 1 : 0;
-	setsockopt(_fd, SOL_SOCKET, SO_REUSEPORT, &val, sizeof(val));
+	_fd = socket(domain, type, 0);
+	if (_fd < 0)
+		throw SkllSocketException();
 	
-	if (_options.send_buf_size > 0) {
-		setsockopt(_fd, SOL_SOCKET, SO_SNDBUF, &_options.send_buf_size, sizeof(int));
+	if (_reuseaddr) {
+		int opt = 1;
+		setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	}
 	
-	if (_options.recv_buf_size > 0) {
-		setsockopt(_fd, SOL_SOCKET, SO_RCVBUF, &_options.recv_buf_size, sizeof(int));
+	/* For IPv6, allow both IPv4 and IPv6 connections if dual-stack requested */
+	if (is_ipv6() && is_ipv4()) {
+		int opt = 0; /* IPV6_V6ONLY = 0 allows dual-stack */
+		setsockopt(_fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt));
 	}
 	
-	// ✅ TCP options (Linux 2.6+ - pas besoin de #ifdef)
-	if (_opts  &SKLL_TCP) {
-		val = _tcp_options.nodelay ? 1 : 0;
-		setsockopt(_fd, IPPROTO_TCP, TCP_NODELAY, &val, sizeof(val));
+	fcntl(_fd, F_SETFL, O_NONBLOCK);
+	
+	if (is_ipv6()) {
+		/* IPv6 bind */
+		struct sockaddr_in6 addr6;
+		std::memset(&addr6, 0, sizeof(addr6));
+		addr6.sin6_family = AF_INET6;
+		addr6.sin6_port = htons(_port);
+		if (_host == "0.0.0.0" || _host == "::") {
+			addr6.sin6_addr = in6addr_any;
+		} else {
+			inet_pton(AF_INET6, _host.c_str(), &addr6.sin6_addr);
+		}
 		
-		val = _tcp_options.keepalive ? 1 : 0;
-		setsockopt(_fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+		if (::bind(_fd, reinterpret_cast<struct sockaddr *>(&addr6), sizeof(addr6)) < 0) {
+			::close(_fd);
+			_fd = -1;
+			throw SkllBindException();
+		}
+	} else {
+		/* IPv4 bind */
+		struct sockaddr_in addr4;
+		std::memset(&addr4, 0, sizeof(addr4));
+		addr4.sin_family = AF_INET;
+		addr4.sin_port = htons(_port);
+		addr4.sin_addr.s_addr = inet_addr(_host.c_str());
+		
+		if (::bind(_fd, reinterpret_cast<struct sockaddr *>(&addr4), sizeof(addr4)) < 0) {
+			::close(_fd);
+			_fd = -1;
+			throw SkllBindException();
+		}
+	}
+	
+	if (is_tcp() && ::listen(_fd, _backlog) < 0) {
+		::close(_fd);
+		_fd = -1;
+		throw SkllListenException();
+	}
+	
+	std::ostringstream oss;
+	oss << "Listening on " << (is_ipv6() ? "[" + _host + "]" : _host) << ":" << _port;
+	if (is_ipv6() && is_ipv4()) oss << " (dual-stack)";
+	SkllLog::success(oss.str());
+	return true;
+}
+
+void SkllProtocol::close() {
+	if (_fd >= 0) {
+		::close(_fd);
+		_fd = -1;
 	}
 }
-
-SkllProtocol &SkllProtocol::set_reuseaddr(bool enable) {
-    if (_running) return *this;
-    _options.reuse_addr = enable;
-    return *this;
-}
-
-SkllProtocol &SkllProtocol::set_nodelay(bool enable) {
-    if (_running) return *this;
-    _tcp_options.nodelay = enable;
-    return *this;
-}
-
-SkllProtocol &SkllProtocol::set_keepalive(bool enable) {
-    if (_running) return *this;
-    _tcp_options.keepalive = enable;
-    return *this;
-}
-
-SkllProtocol &SkllProtocol::set_buffer_sizes(int send_size, int recv_size) {
-    if (_running) return *this;
-    _options.send_buf_size = send_size;
-    _options.recv_buf_size = recv_size;
-    return *this;
-}
-
-SkllProtocol &SkllProtocol::set_chunk_size(int size) {
-    if (_running) return *this;
-    _options.chunk_size = size;
-    return *this;
-}
-
-SkllProtocol &SkllProtocol::on(int event, SkllHook::Callback callback, void *user_data) {
-    _hook.on(event, callback, user_data);
-    return *this;
-}
-
-void SkllProtocol::trigger_event(int type, SkllClient *client, SkllMessage *msg, int error) {
-    SkllEvent event;
-    event.type = type;
-    event.protocol = this;
-    event.network = _network;
-    event.server = _network ? _network->get_server() : NULL;
-    event.client = client;
-    event.message = msg;
-    event.error_code = error;
-    
-    _hook.trigger(type, &event);
-}
-
-SkllRouter &SkllProtocol::router() {
-    return _router;
-}
-
-void SkllProtocol::add_client(int fd, SkllClient *client) {
-    _clients[fd] = client;
-}
-
-void SkllProtocol::remove_client(int fd) {
-    _clients.erase(fd);
-}
-
-SkllClient *SkllProtocol::get_client(int fd) {
-    std::map<int, SkllClient*>::iterator it = _clients.find(fd);
-    return (it != _clients.end()) ? it->second : NULL;
-}
-
-const std::map<int, SkllClient*> &SkllProtocol::get_clients() const {
-    return _clients;
-}
-
-void SkllProtocol::send(int fd, SkllMessage &msg) {
-    msg.set_protocol(this);
-    msg.set_fd(fd);
-    msg.send_to(fd);
-    trigger_event(SKLL_ON_SEND, get_client(fd), &msg);
-}
-
-void SkllProtocol::send(int fd, const std::string &data) {
-    SkllMessage msg;
-    msg.set_protocol(this);
-    msg.set_fd(fd);
-    msg << data;
-    msg.send();
-}
-
-void SkllProtocol::broadcast(SkllMessage &msg) {
-    for (std::map<int, SkllClient*>::iterator it = _clients.begin();
-         it != _clients.end(); ++it) {
-        send(it->first, msg);
-    }
-}
-
-void SkllProtocol::broadcast(const std::string &data) {
-    for (std::map<int, SkllClient*>::iterator it = _clients.begin();
-         it != _clients.end(); ++it) {
-        send(it->first, data);
-    }
-}
-
-void SkllProtocol::on_recv_data(int fd, const uint8_t *data, size_t len) {
-    SkllClient *client = get_client(fd);
-    if (!client) return;
-    
-    SkllEvent event;
-    event.type = SKLL_ON_RECV;
-    event.protocol = this;
-    event.network = _network;
-    event.server = _network ? _network->get_server() : NULL;
-    event.client = client;
-    event.message = &client->recv_msg;
-    event.fd = fd;
-    
-    _router.on_recv_data(data, len, &event);
-    
-    trigger_event(SKLL_ON_RECV, client, &client->recv_msg);
-}
-
-void SkllProtocol::set_network(SkllNetwork *network) {
-    _network = network;
-}
-
-SkllNetwork *SkllProtocol::get_network() const {
-    return _network;
-}
-
-int SkllProtocol::get_fd() const { return _fd; }
-const std::string &SkllProtocol::get_name() const { return _name; }
-const std::string &SkllProtocol::get_address() const { return _addr; }
-int SkllProtocol::get_port() const { return _port; }
-bool SkllProtocol::is_tcp() const { return (_opts & SKLL_TCP); }
-bool SkllProtocol::is_udp() const { return (_opts & SKLL_UDP); }
-bool SkllProtocol::is_started() const { return _started; }
-bool SkllProtocol::is_running() const { return _running; }
-bool SkllProtocol::is_stopped() const { return _stopped; }

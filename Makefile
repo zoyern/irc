@@ -30,21 +30,22 @@ DEPFLAGS	= -MMD -MP -MF $(DEP_DIR)/$*.d
 AR			= ar rcs
 RM			= rm -rf
 
-SRC			=	Sockell.cpp
-SRC			+=	SkllSignals.cpp
-SRC			+=	SkllErrors.cpp
-SRC			+=	SkllHook.cpp
-SRC			+=	SkllEvent.cpp
-SRC			+=	SkllMessage.cpp
-SRC			+=	SkllRouter.cpp
-SRC			+=	SkllProtocol.cpp
-SRC			+=	SkllNetwork.cpp
-SRC			+=	SkllClient.cpp
-SRC			+=	SkllChannel.cpp
-SRC			+=	SkllServer.cpp \
-				SkllServer/SkllServerGetters.cpp \
-				SkllServer/SkllServerPrivate.cpp \
-				SkllServer/SkllServerSetters.cpp
+SRC			=	SkllTypes.cpp \
+				SkllLog.cpp \
+				SkllBuffer.cpp \
+				SkllMessage.cpp \
+				SkllSender.cpp \
+				SkllHook.cpp \
+				SkllRouter.cpp \
+				SkllClient.cpp \
+				SkllChannel.cpp \
+				SkllChannels.cpp \
+				SkllException.cpp \
+				SkllProtocol.cpp \
+				SkllNetwork.cpp \
+				SkllSignals.cpp \
+				SkllEvent.cpp \
+				SkllServer.cpp
 
 SRCS		= $(addprefix $(SRC_DIR)/, $(SRC))
 OBJS		= $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))

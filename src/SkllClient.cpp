@@ -11,83 +11,84 @@
 /* ************************************************************************** */
 
 #include <Sockell/SkllClient.hpp>
-#include <Sockell/SkllProtocol.hpp>
+#include <cstring>
 
-SkllRateLimit::SkllRateLimit()
-	: max_messages(0), window_seconds(0) {}
+SkllClient::SkllClient() : _fd(-1), _port(0), _data(0), _is_udp(false), _udp_addr_len(0) {
+	std::memset(&_udp_addr, 0, sizeof(_udp_addr));
+}
 
-SkllRateLimit::SkllRateLimit(size_t max_msg, time_t window)
-	: max_messages(max_msg), window_seconds(window) {}
-	
-bool SkllRateLimit::is_allowed() {
-	if (max_messages == 0) return true;
-	
-	time_t now = std::time(NULL);
-	time_t threshold = now - window_seconds;
+SkllClient::SkllClient(const SkllClient &other)
+	: _fd(other._fd), _port(other._port),  _data(other._data), _in(), _out(), _ip(other._ip)
+	,  _is_udp(other._is_udp), _udp_addr_len(other._udp_addr_len), _udp_addr(other._udp_addr) {}
 
-	while (!timestamps.empty() && timestamps.front() < threshold) {
-		timestamps.pop_front();
+SkllClient &SkllClient::operator=(const SkllClient &other) {
+	if (this != &other) {
+		_fd = other._fd;
+		_port = other._port;
+		_ip = other._ip;
+		_data = other._data;
+		_udp_addr = other._udp_addr;
+		_udp_addr_len = other._udp_addr_len;
+		_is_udp = other._is_udp;
 	}
-	
-	return timestamps.size() < max_messages;
-}
-
-void SkllRateLimit::record() {
-	if (max_messages == 0) return;
-	timestamps.push_back(std::time(NULL));
-}
-
-void SkllRateLimit::reset() {
-	timestamps.clear();
-}
-
-SkllClient::SkllClient()
-	: fd(-1), id(""), userdata(NULL) {}
-
-SkllClient::SkllClient(int client_fd, const std::string &client_id)
-	: fd(client_fd), id(client_id), userdata(NULL) {
-	recv_msg.set_fd(client_fd);
-	send_msg.set_fd(client_fd);
+	return *this;
 }
 
 SkllClient::~SkllClient() {}
 
-SkllClient::SkllClient(const SkllClient&) {}
-SkllClient	&SkllClient::operator=(const SkllClient&) { return (*this); }
-
-SkllClient &SkllClient::on(int event, SkllHook::Callback cb, void *user_data) {
-	hook.on(event, cb, user_data);
-	return (*this);
+void SkllClient::init(fd_t fd) {
+	_fd = fd;
+	_ip.clear();
+	_port = 0;
+	_in.reset();
+	_out.reset();
+	_is_udp = false;
+	_udp_addr_len = 0;
+	std::memset(&_udp_addr, 0, sizeof(_udp_addr));
 }
 
-void SkllClient::send(const std::string &data) {
-	send_msg.clear();
-	send_msg << data;
-	send_msg.send();
+void SkllClient::reset() {
+	_fd = -1;
+	_ip.clear();
+	_port = 0;
+	_in.reset();
+	_out.reset();
+	_data = 0;
+	_is_udp = false;
+	_udp_addr_len = 0;
+	std::memset(&_udp_addr, 0, sizeof(_udp_addr));
 }
 
-void SkllClient::send(SkllMessage &msg) {
-	msg.set_fd(fd);
-	msg.send();
+bool SkllClient::active() const { return _fd >= 0; }
+fd_t SkllClient::fd() const { return _fd; }
+
+void SkllClient::set_addr(const std::string &ip, int port) {
+	_ip = ip;
+	_port = port;
 }
 
-void SkllClient::set_rate_limit(size_t max_messages, time_t window_seconds) {
-	rate_limit = SkllRateLimit(max_messages, window_seconds);
+const std::string &SkllClient::ip() const { return _ip; }
+int SkllClient::port() const { return _port; }
+
+/* UDP support */
+void SkllClient::set_udp_addr(const struct sockaddr_storage &addr, socklen_t len) {
+	_udp_addr = addr;
+	_udp_addr_len = len;
+	_is_udp = true;
 }
 
-bool SkllClient::is_rate_limited() {
-	return !rate_limit.is_allowed();
+const struct sockaddr *SkllClient::udp_addr() const {
+	return reinterpret_cast<const struct sockaddr *>(&_udp_addr);
 }
 
-int SkllClient::get_fd() const { return fd; }
-const std::string &SkllClient::get_id() const { return id; }
+socklen_t SkllClient::udp_addr_len() const { return _udp_addr_len; }
+bool SkllClient::is_udp() const { return _is_udp; }
 
-void SkllClient::set_fd(int client_fd) {
-	fd = client_fd;
-	recv_msg.set_fd(client_fd);
-	send_msg.set_fd(client_fd);
-}
+SkllBuffer &SkllClient::in() { return _in; }
+SkllBuffer &SkllClient::out() { return _out; }
+const SkllBuffer &SkllClient::in() const { return _in; }
+const SkllBuffer &SkllClient::out() const { return _out; }
 
-void SkllClient::set_id(const std::string &client_id) {
-	id = client_id;
-}
+void *SkllClient::raw_data() { return _data; }
+const void *SkllClient::raw_data() const { return _data; }
+void SkllClient::set_raw_data(void *ptr) { _data = ptr; }

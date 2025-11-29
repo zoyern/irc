@@ -10,102 +10,124 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+
 #include <Sockell/SkllServer.hpp>
+#include <Sockell/SkllEvent.hpp>
+#include <Sockell/SkllLog.hpp>
+#include <sys/resource.h>
+#include <csignal>
+#include <sstream>
 
-SkllServer::~SkllServer() { shutdown(); }
-SkllServer::SkllServer(int max_cli, bool mute, int res)
-	: _started(false), _running(false), _stopped(false), _mute(mute)
-	, _max_clients(max_cli), _reserved(res), _used(SKLLSERVER_FDLOCKED)
-	, _fd_limit(0), _chan_default(NULL) {}
+SkllServer::SkllServer() : _running(false), _data(0) {}
 
-int	SkllServer::start() {
-	if (_started) return (0);
-
-	update_fd_limits();
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it)
-		it->second->start();
-	_started = true;
-	trigger_event(SKLL_ON_START);
-	return (0);
+SkllServer::~SkllServer() {
+	/* Networks may already be destroyed if they're local objects in a containing class */
+	/* Just clear the list - don't try to close them (they should close themselves) */
+	_networks.clear();
 }
 
-int	SkllServer::run() {
-	if (_running) return (0);
-	if (!_started) start();
-
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it)
-		it->second->run();
-	_running = true;
-	while (_running) {
-		for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it)
-			it->second->update();
-		trigger_event(SKLL_ON_UPDATE);
+SkllServer &SkllServer::set_fd_limit(size_t limit) {
+	struct rlimit rl;
+	rl.rlim_cur = limit;
+	rl.rlim_max = limit;
+	if (setrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		std::ostringstream oss;
+		oss << "FD limit set to " << limit;
+		SkllLog::info(oss.str());
+	} else {
+		SkllLog::warn("Failed to set FD limit");
 	}
-	return (0);
+	return *this;
 }
 
-int	SkllServer::stop() {
-	if (!_running || _stopped) return (0);
-
-	if (!_mute) std::cout << SKLL_YELLOW << "\n● " << SKLL_RESET << "Shutting down..." << std::endl;
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it)
-		it->second->stop();
-	_running = false;
-	_stopped = true;
-	trigger_event(SKLL_ON_STOP);
-	return (0);
+SkllServer &SkllServer::add(SkllNetwork &net) {
+	net.set_server(this);
+	_networks.push_back(&net);
+	return *this;
 }
 
-int SkllServer::shutdown() {
-	if (!_started) return (0);
+size_t SkllServer::network_count() const { return _networks.size(); }
+SkllChannels &SkllServer::channels() { return _channels; }
 
-	trigger_event(SKLL_ON_SHUTDOWN);
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it)
-		it->second->shutdown();
-	_started = false;
-	_running = false;
-	_stopped = true;
-	return (0);
+SkllServer &SkllServer::set_default_channel(const std::string &name) {
+	_default_channel = name;
+	return *this;
 }
 
-void	SkllServer::broadcast(const std::string &msg) {
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it) {
-		const std::map<std::string, SkllProtocol*> &protocols = it->second->get_protocols();
-		for (std::map<std::string, SkllProtocol*>::const_iterator pit = protocols.begin(); pit != protocols.end(); ++pit)
-			pit->second->broadcast(msg);
+const std::string &SkllServer::default_channel() const { return _default_channel; }
+SkllSignals &SkllServer::signals() { return _signals; }
+
+SkllServer &SkllServer::on(int type, SkllCallback fn) {
+	if (type &SKLL_EV_START)  _on_start.add(fn);
+	if (type &SKLL_EV_STOP)   _on_stop.add(fn);
+	if (type &SKLL_EV_SIGNAL) _on_signal.add(fn);
+	return *this;
+}
+
+bool SkllServer::init() {
+	if (!_signals.setup()) {
+		SkllLog::error("Failed to setup signals");
+		return false;
 	}
-}
-
-void	SkllServer::broadcast(const std::string &msg, int opts) {
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it) {
-		const std::map<std::string, SkllProtocol*> &protocols = it->second->get_protocols();
-		for (std::map<std::string, SkllProtocol*>::const_iterator pit = protocols.begin(); pit != protocols.end(); ++pit) {
-			SkllProtocol *proto = pit->second;
-			if (opts & SKLL_TCP && !proto->is_tcp()) continue;
-			if (opts & SKLL_UDP && !proto->is_udp()) continue;
-			proto->broadcast(msg);
+	
+	for (size_t i = 0; i < _networks.size(); ++i) {
+		if (!_networks[i]->init()) {
+			std::ostringstream oss;
+			oss << "Failed to init network " << _networks[i]->name();
+			SkllLog::error(oss.str());
+			return false;
 		}
 	}
+	
+	SkllEvent event;
+	event.set_event_type(SKLL_EV_START);
+	event.set_server(this);
+	_on_start.run(event);
+	
+	return true;
 }
 
-void	SkllServer::broadcast(SkllMessage &msg) {
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it) {
-		const std::map<std::string, SkllProtocol*> &protocols = it->second->get_protocols();
-		for (std::map<std::string, SkllProtocol*>::const_iterator pit = protocols.begin(); pit != protocols.end(); ++pit)
-			pit->second->broadcast(msg);
+int SkllServer::run() {
+	_running = true;
+	SkllLog::success("Server running");
+	
+	while (_running) {
+		for (size_t i = 0; i < _networks.size(); ++i)
+			_networks[i]->poll_once();
+		
+		if (_signals.pending())
+			_handle_signal();
 	}
+	
+	SkllEvent event;
+	event.set_event_type(SKLL_EV_STOP);
+	event.set_server(this);
+	_on_stop.run(event);
+	
+	SkllLog::info("Server stopped");
+	return 0;
 }
 
-size_t	SkllServer::update_fd_limits() {
-	struct rlimit rl;
-	size_t needed = _max_clients + _used + _reserved;
-	if (getrlimit(RLIMIT_NOFILE, &rl) != 0)
-		throw std::runtime_error("getrlimit() failed");
-	if (needed > rl.rlim_max)
-		throw std::runtime_error("FD limit exceeded");
-	rl.rlim_cur = needed;
-	if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
-		throw std::runtime_error("setrlimit() failed");
-	_fd_limit = rl.rlim_cur;
-	return (_fd_limit);
+void SkllServer::stop() { _running = false; }
+bool SkllServer::running() const { return _running; }
+
+void SkllServer::_handle_signal() {
+	while (_signals.pending()) {
+		int sig = _signals.pop();
+		
+		if (sig == SIGPIPE) continue;
+		
+		std::ostringstream oss;
+		oss << "Signal " << sig << " received";
+		SkllLog::info(oss.str());
+		
+		SkllEvent event;
+		event.set_event_type(SKLL_EV_SIGNAL);
+		event.set_server(this);
+		event.set_signal_number(sig);
+		
+		int ret = _on_signal.run(event);
+		if (ret == SKLL_FATAL || sig == SIGINT || sig == SIGTERM)
+			_running = false;
+	}
 }

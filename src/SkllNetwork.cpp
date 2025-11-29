@@ -13,480 +13,354 @@
 
 #include <Sockell/SkllNetwork.hpp>
 #include <Sockell/SkllServer.hpp>
-#include <Sockell/SkllErrors.hpp>
-#include <Sockell.hpp>
+#include <Sockell/SkllEvent.hpp>
+#include <Sockell/SkllException.hpp>
+#include <Sockell/SkllLog.hpp>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <cerrno>
 #include <cstring>
-#include <iostream>
-#include <iomanip>
 #include <sstream>
 
+/* Constructors with dynamic event buffer */
 SkllNetwork::SkllNetwork()
-	: _epfd(-1), _signal_fd(-1), _name("default"), _timeout(100), _queue(128)
-	, _events(EPOLLIN | EPOLLRDHUP | EPOLLET)
-	, _started(false), _running(false), _stopped(false)
-	, _server(NULL) {}
+	: _server(0), _timeout(-1), _delim("\r\n"), _epoll_fd(-1),
+	  _max_events(SKLL_DEFAULT_MAX_EVENTS), _events(SKLL_DEFAULT_MAX_EVENTS),
+	  _conn_limit(0), _conn_window(SKLL_DEFAULT_CONN_WINDOW),
+	  _msg_limit(0), _msg_window(SKLL_DEFAULT_MSG_WINDOW) {}
 
-SkllNetwork::SkllNetwork(const std::string &name, int timeout, int queue)
-	: _epfd(-1), _signal_fd(-1), _name(name), _timeout(timeout), _queue(queue)
-	, _events(EPOLLIN | EPOLLRDHUP | EPOLLET)
-	, _started(false), _running(false), _stopped(false)
-	, _server(NULL) {}
+SkllNetwork::SkllNetwork(const std::string &name)
+	: _server(0), _name(name), _timeout(-1), _delim("\r\n"), _epoll_fd(-1),
+	  _max_events(SKLL_DEFAULT_MAX_EVENTS), _events(SKLL_DEFAULT_MAX_EVENTS),
+	  _conn_limit(0), _conn_window(SKLL_DEFAULT_CONN_WINDOW),
+	  _msg_limit(0), _msg_window(SKLL_DEFAULT_MSG_WINDOW) {}
 
 SkllNetwork::~SkllNetwork() {
-	shutdown();
+	/* Don't iterate over _protocols - they may already be destroyed */
+	/* Close listening fds directly (we have the fd numbers) */
+	for (std::map<fd_t, SkllProtocol *>::iterator it = _listen_fds.begin(); it != _listen_fds.end(); ++it)
+		::close(it->first);
+	/* Close client fds */
+	for (std::map<fd_t, SkllClient>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+		::close(it->first);
+	/* Close epoll fd */
+	if (_epoll_fd >= 0) ::close(_epoll_fd);
 }
 
-int SkllNetwork::start() {
-	if (_started) return 0;
-	
-	_epfd = epoll_create1(EPOLL_CLOEXEC);
-	if (_epfd < 0) {
-		throw SkllErrorEpoll("epoll_create1() failed");
-	}
-	
-	_ev.resize(_queue);
-	setup_signals();
-	
-	_started = true;
-	trigger_event(SKLL_ON_START);
-	
-	return 0;
-}
+SkllNetwork &SkllNetwork::set_name(const std::string &name) { _name = name; return *this; }
+SkllNetwork &SkllNetwork::set_timeout(int ms) { _timeout = ms; return *this; }
+SkllNetwork &SkllNetwork::set_delim(const std::string &d) { _delim = d; return *this; }
 
-int SkllNetwork::run() {
-	if (!_started) start();
-	if (_running) return 0;
-	
-	for (std::map<std::string, SkllProtocol*>::iterator it = _protocols.begin();
-		 it != _protocols.end(); ++it) {
-		
-		SkllProtocol *proto = it->second;
-		proto->run();
-		
-		_fd_to_protocol[proto->get_fd()] = proto;
-		add_to_epoll(proto->get_fd(), _events);
-	}
-	
-	_running = true;
-	
-	print_startup_info();
-	
-	return 0;
-}
-
-void SkllNetwork::print_startup_info() {
-	if (_protocols.empty()) return;
-	
-	std::cout << SKLL_CYAN << "┌────────────────────────────────────────┐\n"
-			  << "│ " << SKLL_BOLD << _name << SKLL_RESET << SKLL_CYAN;
-	
-	int name_len = _name.length();
-	for (int i = 0; i < (38 - name_len); ++i) std::cout << " ";
-	std::cout << "\n"
-			  << "├────────────────────────────────────────┤\n";
-	
-	for (std::map<std::string, SkllProtocol*>::iterator it = _protocols.begin();
-		 it != _protocols.end(); ++it) {
-		
-		SkllProtocol *proto = it->second;
-		
-		std::cout << "│ " << SKLL_GREEN << "●" << SKLL_RESET << " "
-				  << std::left << std::setw(8) << proto->get_name()
-				  << SKLL_DIM << proto->get_address() << ":" << proto->get_port()
-				  << SKLL_RESET << SKLL_CYAN;
-		
-		std::ostringstream addr;
-		addr << proto->get_address() << ":" << proto->get_port();
-		int addr_len = proto->get_name().length() + addr.str().length();
-		for (int i = 0; i < (27 - addr_len); ++i) std::cout << " ";
-		std::cout << "\n";
-	}
-	
-	std::cout << "├────────────────────────────────────────┤\n"
-			  << "│ " << SKLL_DIM << "Epoll: " << _epfd 
-			  << "  │  Signal: " << SkllSignals::get_fd()
-			  << SKLL_RESET << SKLL_CYAN << "\n"
-			  << "└────────────────────────────────────────┘"
-			  << SKLL_RESET << std::endl;
-}
-
-const std::map<std::string, SkllProtocol*> &SkllNetwork::get_protocols() const {
-	return _protocols;
-}
-
-int SkllNetwork::stop() {
-	if (!_running || _stopped) return 0;
-	
-	_stopped = true;
-	_running = false;
-	
-	trigger_event(SKLL_ON_STOP);
-	
-	return 0;
-}
-
-int SkllNetwork::shutdown() {
-	if (_epfd < 0) return 0;
-	
-	for (std::map<std::string, SkllProtocol*>::iterator it = _protocols.begin();
-		 it != _protocols.end(); ++it) {
-		it->second->stop();
-	}
-	
-	for (std::map<std::string, SkllProtocol*>::iterator it = _protocols.begin();
-		 it != _protocols.end(); ++it) {
-		
-		const std::map<int, SkllClient*> &clients = it->second->get_clients();
-		
-		std::vector<int> fds_to_close;
-		for (std::map<int, SkllClient*>::const_iterator cit = clients.begin();
-			 cit != clients.end(); ++cit) {
-			fds_to_close.push_back(cit->first);
-		}
-		
-		for (size_t i = 0; i < fds_to_close.size(); ++i) {
-			SkllClient *client = it->second->get_client(fds_to_close[i]);
-			if (client) {
-				it->second->remove_client(fds_to_close[i]);
-				close(fds_to_close[i]);
-				delete client;
-			}
-		}
-	}
-	
-	if (_signal_fd >= 0) {
-		remove_from_epoll(_signal_fd);
-		SkllSignals::cleanup();
-		_signal_fd = -1;
-	}
-	
-	if (_epfd >= 0) {
-		close(_epfd);
-		_epfd = -1;
-	}
-	
-	_started = false;
-	_running = false;
-	_stopped = true;
-	
-	trigger_event(SKLL_ON_SHUTDOWN);
-	
-	return 0;
-}
-
-void SkllNetwork::setup_signals() {
-	_signal_fd = SkllSignals::setup();
-	if (_signal_fd >= 0) {
-		add_to_epoll(_signal_fd, EPOLLIN);
-	}
-}
-
-SkllNetwork &SkllNetwork::on(int event, SkllHook::Callback callback, void *user_data) {
-	_hook.on(event, callback, user_data);
+SkllNetwork &SkllNetwork::set_max_events(size_t n) {
+	_max_events = (n > 0) ? n : 1;
+	_events.resize(_max_events);
 	return *this;
 }
 
-void SkllNetwork::trigger_event(int type, SkllProtocol *proto, int error) {
-	SkllEvent event;
-	event.type = type;
-	event.network = this;
-	event.server = _server;
-	event.protocol = proto;
-	event.error_code = error;
+void	SkllNetwork::set_server(SkllServer *s) { _server = s; }
+void	SkllNetwork::disconnect(SkllEvent &e){ e.channels().remove_all(e.fd()); _handle_close(e.fd());}
+const std::string &SkllNetwork::name() const { return _name; }
+int SkllNetwork::timeout() const { return _timeout; }
+const std::string &SkllNetwork::delim() const { return _delim; }
+size_t SkllNetwork::max_events() const { return _max_events; }
+fd_t SkllNetwork::epoll_fd() const { return _epoll_fd; }
+SkllServer *SkllNetwork::server() { return _server; }
+
+SkllNetwork &SkllNetwork::add(SkllProtocol &proto) {
+	_protocols.push_back(&proto);
+	return *this;
+}
+
+size_t SkllNetwork::protocol_count() const { return _protocols.size(); }
+
+SkllClient &SkllNetwork::add_client(fd_t fd) {
+	_clients[fd].init(fd);
+	return _clients[fd];
+}
+
+SkllClient *SkllNetwork::get_client(fd_t fd) {
+	std::map<fd_t, SkllClient>::iterator it = _clients.find(fd);
+	return (it != _clients.end()) ? &it->second : 0;
+}
+
+void SkllNetwork::remove_client(fd_t fd) {
+	_clients.erase(fd);
+}
+
+size_t SkllNetwork::client_count() const { return _clients.size(); }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   RATE LIMITING                                                             */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+SkllNetwork &SkllNetwork::set_conn_limit(size_t max_per_ip, int window_sec) {
+	_conn_limit = max_per_ip;
+	_conn_window = window_sec;
+	return *this;
+}
+
+SkllNetwork &SkllNetwork::set_msg_limit(size_t max_per_client, int window_sec) {
+	_msg_limit = max_per_client;
+	_msg_window = window_sec;
+	return *this;
+}
+
+bool SkllNetwork::check_conn_rate(const std::string &ip) {
+	if (_conn_limit == 0) return true; /* Disabled */
 	
-	_hook.trigger(type, &event);
-	if (proto) proto->_hook.trigger(type, &event);
-}
-
-SkllProtocol &SkllNetwork::listen(SkllProtocol &protocol) {
-	protocol.set_network(this);
-	_protocols[protocol.get_name()] = &protocol;
-	return (protocol);
-}
-
-void SkllNetwork::remove_protocol(SkllProtocol *protocol) {
-	if (!protocol) return;
+	time_t now = std::time(0);
+	SkllRateLimit &rate = _conn_rates[ip];
 	
-	_protocols.erase(protocol->get_name());
-	_fd_to_protocol.erase(protocol->get_fd());
-	remove_from_epoll(protocol->get_fd());
-}
-
-SkllProtocol *SkllNetwork::get_protocol(const std::string &name) {
-	std::map<std::string, SkllProtocol*>::iterator it = _protocols.find(name);
-	return (it != _protocols.end()) ? it->second : NULL;
-}
-
-SkllProtocol *SkllNetwork::get_protocol(int fd) {
-	std::map<int, SkllProtocol*>::iterator it = _fd_to_protocol.find(fd);
-	return (it != _fd_to_protocol.end()) ? it->second : NULL;
-}
-
-void SkllNetwork::add_to_epoll(int fd, uint32_t events) {
-	epoll_event ev;
-	ev.events = events;
-	ev.data.fd = fd;
-	
-	epoll_ctl(_epfd, EPOLL_CTL_ADD, fd, &ev);
-}
-
-void SkllNetwork::remove_from_epoll(int fd) {
-	epoll_ctl(_epfd, EPOLL_CTL_DEL, fd, NULL);
-}
-
-void SkllNetwork::update() {
-	if (!_running) return;
-	
-	trigger_event(SKLL_ON_UPDATE);
-	
-	int n = epoll_wait(_epfd, &_ev[0], _queue, _timeout);
-	
-	if (n < 0) {
-		if (errno == EINTR) return;
-		trigger_event(SKLL_ON_ERROR, NULL, errno);
-		return;
+	/* Reset window if expired */
+	if (now - rate.window_start >= _conn_window) {
+		rate.count = 0;
+		rate.window_start = now;
 	}
 	
-	if (n == 0) {
-		trigger_event(SKLL_ON_TIMEOUT);
-		return;
+	rate.count++;
+	return rate.count <= _conn_limit;
+}
+
+bool SkllNetwork::check_msg_rate(fd_t fd) {
+	if (_msg_limit == 0) return true; /* Disabled */
+	
+	time_t now = std::time(0);
+	SkllRateLimit &rate = _msg_rates[fd];
+	
+	/* Reset window if expired */
+	if (now - rate.window_start >= _msg_window) {
+		rate.count = 0;
+		rate.window_start = now;
 	}
+	
+	rate.count++;
+	return rate.count <= _msg_limit;
+}
+
+void SkllNetwork::clear_rate_limits() {
+	_conn_rates.clear();
+	_msg_rates.clear();
+}
+
+SkllNetwork &SkllNetwork::on(int type, SkllCallback fn) {
+	if (type &SKLL_EV_ACCEPT)  _on_accept.add(fn);
+	if (type &SKLL_EV_CLOSE)   _on_close.add(fn);
+	if (type &SKLL_EV_MESSAGE) _on_message.add(fn);
+	if (type &SKLL_EV_ERROR)   _on_error.add(fn);
+	return *this;
+}
+
+SkllHooks &SkllNetwork::hooks(int type) {
+	if (type &SKLL_EV_ACCEPT)  return _on_accept;
+	if (type &SKLL_EV_CLOSE)   return _on_close;
+	if (type &SKLL_EV_ERROR)   return _on_error;
+	return _on_message;
+}
+
+SkllRouter &SkllNetwork::router() { return _router; }
+
+bool SkllNetwork::init() {
+	if (_protocols.empty())
+		throw SkllConfigException();
+	
+	_epoll_fd = epoll_create1(0);
+	if (_epoll_fd < 0)
+		throw SkllEpollException();
+	
+	for (size_t i = 0; i < _protocols.size(); ++i) {
+		_protocols[i]->bind(); /* Throws on error */
+		
+		struct epoll_event ev;
+		ev.events = EPOLLIN;
+		ev.data.fd = _protocols[i]->fd();
+		if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _protocols[i]->fd(), &ev) < 0)
+			throw SkllEpollException();
+		_listen_fds[_protocols[i]->fd()] = _protocols[i];
+	}
+	
+	std::ostringstream oss;
+	oss << _name << " network initialized";
+	SkllLog::info(oss.str());
+	return true;
+}
+
+void SkllNetwork::close() {
+	/* Close all client connections */
+	for (std::map<fd_t, SkllClient>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+		::close(it->first);
+	_clients.clear();
+	
+	/* Close listening protocols - check if not already closed */
+	for (size_t i = 0; i < _protocols.size(); ++i) {
+		if (_protocols[i]) _protocols[i]->close();
+	}
+	_protocols.clear();  /* Prevent double-close */
+	_listen_fds.clear();
+	
+	/* Close epoll fd */
+	if (_epoll_fd >= 0) {
+		::close(_epoll_fd);
+		_epoll_fd = -1;
+	}
+}
+
+int SkllNetwork::poll_once() {
+	/* Use dynamic event buffer - no fixed limit */
+	int n = epoll_wait(_epoll_fd, &_events[0], static_cast<int>(_max_events), _timeout);
 	
 	for (int i = 0; i < n; ++i) {
-		handle_event(_ev[i].data.fd, _ev[i].events);
+		fd_t fd = _events[i].data.fd;
+		
+		std::map<fd_t, SkllProtocol *>::iterator lit = _listen_fds.find(fd);
+		if (lit != _listen_fds.end()) {
+				_handle_accept(*lit->second);
+			continue;
+		}
+		
+		if (_events[i].events &(EPOLLHUP | EPOLLERR)) {
+			_handle_close(fd);
+		} else if (_events[i].events &EPOLLIN) {
+			_handle_read(fd);
+		}
 	}
+	
+	return n;
 }
 
-void SkllNetwork::handle_event(int fd, uint32_t events) {
-
-	if (events  &EPOLLERR) {
-		if (_fd_to_protocol.find(fd) == _fd_to_protocol.end()) {
-			for (std::map<std::string, SkllProtocol*>::iterator pit = _protocols.begin();
-				 pit != _protocols.end(); ++pit) {
-				
-				SkllClient *client = pit->second->get_client(fd);
-				if (client) {
-					SkllEvent event;
-					event.type = SKLL_ON_DISCONNECT;
-					event.network = this;
-					event.server = _server;
-					event.protocol = pit->second;
-					event.client = client;
-					event.fd = fd;
-					
-					_hook.trigger(SKLL_ON_DISCONNECT, &event);
-					pit->second->_hook.trigger(SKLL_ON_DISCONNECT, &event);
-					
-					pit->second->remove_client(fd);
-					delete client;
-					break;
-				}
-			}
-			
-			remove_from_epoll(fd);
-			close(fd);
-		}
+void SkllNetwork::_handle_accept(SkllProtocol &proto) {
+	/* Use sockaddr_storage to support both IPv4 and IPv6 */
+	struct sockaddr_storage addr_storage;
+	socklen_t len = sizeof(addr_storage);
+	fd_t cfd = accept(proto.fd(), reinterpret_cast<struct sockaddr *>(&addr_storage), &len);
+	if (cfd < 0) return;
+	
+	/* Extract IP address - handle both IPv4 and IPv6 */
+	char ip_buf[64];
+	std::string ip;
+	int port = 0;
+	
+	if (addr_storage.ss_family == AF_INET) {
+		struct sockaddr_in *addr4 = reinterpret_cast<struct sockaddr_in *>(&addr_storage);
+		inet_ntop(AF_INET, &addr4->sin_addr, ip_buf, sizeof(ip_buf));
+		port = ntohs(addr4->sin_port);
+	} else if (addr_storage.ss_family == AF_INET6) {
+		struct sockaddr_in6 *addr6 = reinterpret_cast<struct sockaddr_in6 *>(&addr_storage);
+		inet_ntop(AF_INET6, &addr6->sin6_addr, ip_buf, sizeof(ip_buf));
+		port = ntohs(addr6->sin6_port);
+	}
+	ip = ip_buf;
+	
+	/* Rate limit check - reject if too many connections from this IP */
+	if (!check_conn_rate(ip)) {
+		SkllLog::warn("Rate limit exceeded for " + ip + " - connection rejected");
+		::close(cfd);
 		return;
 	}
-
-	if (events  &(EPOLLHUP | EPOLLRDHUP)) {
-		if (_fd_to_protocol.find(fd) == _fd_to_protocol.end()) {
-			for (std::map<std::string, SkllProtocol*>::iterator pit = _protocols.begin();
-				 pit != _protocols.end(); ++pit) {
-				
-				SkllClient *client = pit->second->get_client(fd);
-				if (client) {
-					SkllEvent event;
-					event.type = SKLL_ON_DISCONNECT;
-					event.network = this;
-					event.server = _server;
-					event.protocol = pit->second;
-					event.client = client;
-					event.fd = fd;
-					
-					_hook.trigger(SKLL_ON_DISCONNECT, &event);
-					pit->second->_hook.trigger(SKLL_ON_DISCONNECT, &event);
-					
-					pit->second->remove_client(fd);
-					delete client;
-					break;
-				}
-			}
-			
-			remove_from_epoll(fd);
-			close(fd);
-		}
-		return;
-	}
-	if (fd == _signal_fd) {
-		handle_signal();
-		return;
-	}
-	if (events  &EPOLLIN) {
-		if (_fd_to_protocol.find(fd) != _fd_to_protocol.end()) {
-			handle_accept(fd);
-		} else {
-			handle_client_data(fd);
-		}
-	}
-}
-
-void SkllNetwork::handle_accept(int listen_fd) {
-	SkllProtocol *proto = _fd_to_protocol[listen_fd];
-	if (!proto) return;
 	
-	while (true) {
-		sockaddr_storage addr;
-		socklen_t len = sizeof(addr);
-		
-		int client_fd = accept(listen_fd, (sockaddr*)&addr, &len);
-		if (client_fd < 0) {
-			if (errno == EAGAIN || errno == EWOULDBLOCK) break;
-			return;
-		}
-		
-		fcntl(client_fd, F_SETFL, O_NONBLOCK);
-		
-		char ip[INET6_ADDRSTRLEN];
-		int port;
-		
-		if (addr.ss_family == AF_INET) {
-			sockaddr_in *s = (sockaddr_in*)&addr;
-			inet_ntop(AF_INET, &s->sin_addr, ip, sizeof(ip));
-			port = ntohs(s->sin_port);
-		} else {
-			sockaddr_in6 *s = (sockaddr_in6*)&addr;
-			inet_ntop(AF_INET6, &s->sin6_addr, ip, sizeof(ip));
-			port = ntohs(s->sin6_port);
-		}
-		
-		std::ostringstream oss;
-		oss << ip << ":" << port;
-		std::string client_id = oss.str();
-		
-		SkllClient *client = new SkllClient(client_fd, client_id);
-		client->recv_msg.set_protocol(proto);
-		client->send_msg.set_protocol(proto);
-		
-		proto->add_client(client_fd, client);
-		add_to_epoll(client_fd, _events);
-		
-		SkllEvent event;
-		event.type = SKLL_ON_CONNECT;
-		event.network = this;
-		event.server = _server;
-		event.protocol = proto;
-		event.client = client;
-		event.fd = client_fd;
-		
-		_hook.trigger(SKLL_ON_CONNECT, &event);
-		proto->_hook.trigger(SKLL_ON_CONNECT, &event);
-	}
-}
-
-void SkllNetwork::handle_client_data(int client_fd) {
-	SkllProtocol *proto = NULL;
-	SkllClient *client = NULL;
+	fcntl(cfd, F_SETFL, O_NONBLOCK);
 	
-	for (std::map<std::string, SkllProtocol*>::iterator it = _protocols.begin();
-		 it != _protocols.end(); ++it) {
-		
-		client = it->second->get_client(client_fd);
-		if (client) {
-			proto = it->second;
-			break;
-		}
+	if (proto.nodelay()) {
+		int opt = 1;
+		setsockopt(cfd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+	}
+	if (proto.keepalive()) {
+		int opt = 1;
+		setsockopt(cfd, SOL_SOCKET, SO_KEEPALIVE, &opt, sizeof(opt));
 	}
 	
-	if (!client || !proto) return;
+	SkllClient &client = add_client(cfd);
+	client.set_addr(ip, port);
 	
-	uint8_t buffer[4096];
+	struct epoll_event ev;
+	ev.events = EPOLLIN | EPOLLHUP | EPOLLERR;
+	ev.data.fd = cfd;
+	epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, cfd, &ev);
 	
-	while (true) {
-		ssize_t n = recv(client_fd, buffer, sizeof(buffer), 0);
-		
-		if (n > 0) {
-			proto->on_recv_data(client_fd, buffer, n);
-			
-		} else if (n == 0) {
-			SkllEvent event;
-			event.type = SKLL_ON_DISCONNECT;
-			event.network = this;
-			event.server = _server;
-			event.protocol = proto;
-			event.client = client;
-			event.fd = client_fd;
-			
-			_hook.trigger(SKLL_ON_DISCONNECT, &event);
-			proto->_hook.trigger(SKLL_ON_DISCONNECT, &event);
-			
-			proto->remove_client(client_fd);
-			remove_from_epoll(client_fd);
-			close(client_fd);
-			delete client;
-			return;
-			
-		} else {
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
-				break;
-			}
-			SkllEvent event;
-			event.type = SKLL_ON_DISCONNECT;
-			event.network = this;
-			event.server = _server;
-			event.protocol = proto;
-			event.client = client;
-			event.fd = client_fd;
-			event.error_code = errno;
-			
-			_hook.trigger(SKLL_ON_DISCONNECT, &event);
-			proto->_hook.trigger(SKLL_ON_DISCONNECT, &event);
-			
-			proto->remove_client(client_fd);
-			remove_from_epoll(client_fd);
-			close(client_fd);
-			delete client;
-			return;
-		}
-	}
-}
-
-void SkllNetwork::handle_signal() {
-	int sig = SkllSignals::read_signal();
-	if (sig < 0) return;
+	std::ostringstream oss;
+	oss << "Client " << cfd << " (" << client.ip() << ") connected";
+	SkllLog::info(oss.str());
 	
 	SkllEvent event;
-	event.type = SKLL_ON_SIGNAL;
-	event.network = this;
-	event.server = _server;
-	event.signal_num = sig;
+	event.set_event_type(SKLL_EV_ACCEPT);
+	event.set_fd(cfd);
+	event.set_server(_server);
+	event.set_network(this);
+	event.set_client(&client);
+	_on_accept.run(event);
+}
+
+void SkllNetwork::_handle_read(fd_t fd) {
+	SkllClient *client = get_client(fd);
+	if (!client) return;
 	
-	_hook.trigger(SKLL_ON_SIGNAL, &event);
+	byte_t buf[4096];
+	ssize_t n = recv(fd, buf, sizeof(buf), 0);
 	
-	if (sig == SIGINT || sig == SIGTERM || sig == SIGQUIT) {
-		if (_server) {
-			_server->stop();
-		} else {
-			_running = false;
+	if (n <= 0) {
+		_handle_close(fd);
+		return;
+	}
+	
+	client->in().write(buf, n);
+	
+	SkllSpan line;
+	while (!(line = client->in().line(_delim.c_str())).empty()) {
+		/* Rate limit check - ignore if flooding */
+		if (!check_msg_rate(fd)) {
+			SkllLog::warn("Message rate limit exceeded - ignoring");
+			continue;
 		}
+		
+		SkllEvent event;
+		event.set_event_type(SKLL_EV_MESSAGE);
+		event.set_fd(fd);
+		event.set_server(_server);
+		event.set_network(this);
+		event.set_client(client);
+		event.message().set(line);
+		
+		int ret = _router.dispatch(event);
+		if (ret == SKLL_FATAL) return;
+		
+		/* SKLL_STOP means disconnect this client */
+		if (ret == SKLL_STOP) {
+			_handle_close(fd);
+			return;
+		}
+		
+		if (ret != SKLL_SKIP)
+			_on_message.run(event);
 	}
 }
 
-void SkllNetwork::set_server(SkllServer *server) {
-	_server = server;
+void SkllNetwork::_handle_close(fd_t fd) {
+	SkllClient *client = get_client(fd);
+	
+	SkllEvent event;
+	event.set_event_type(SKLL_EV_CLOSE);
+	event.set_fd(fd);
+	event.set_server(_server);
+	event.set_network(this);
+	event.set_client(client);
+	_on_close.run(event);
+	
+	if (client) {
+		std::ostringstream oss;
+		oss << "Client " << fd << " (" << client->ip() << ") disconnected";
+		SkllLog::info(oss.str());
+	}
+	
+	/* Clean up rate limit entry */
+	_msg_rates.erase(fd);
+	
+	epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, fd, 0);
+	::close(fd);
+	remove_client(fd);
 }
 
-SkllServer *SkllNetwork::get_server() const {
-	return _server;
-}
+std::map<fd_t, SkllClient> &SkllNetwork::clients() { return _clients; }
+const std::map<fd_t, SkllClient> &SkllNetwork::clients() const { return _clients; }
 
-int SkllNetwork::get_epoll_fd() const { return _epfd; }
-const std::string &SkllNetwork::get_name() const { return _name; }
-bool SkllNetwork::is_started() const { return _started; }
-bool SkllNetwork::is_running() const { return _running; }

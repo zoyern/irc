@@ -11,40 +11,48 @@
 /* ************************************************************************** */
 
 #pragma once
-#include <ctime>
-#include <sstream>
-#include <string>
-#include <map>
 
-#define SKLL_RESET      "\033[0m"
-#define SKLL_BOLD       "\033[1m"
-#define SKLL_DIM        "\033[2m"
-#define SKLL_RED        "\033[31m"
-#define SKLL_GREEN      "\033[32m"
-#define SKLL_YELLOW     "\033[33m"
-#define SKLL_BLUE       "\033[34m"
-#define SKLL_MAGENTA    "\033[35m"
-#define SKLL_CYAN       "\033[36m"
-#define SKLL_WHITE      "\033[37m"
-#define SKLL_GRAY       "\033[90m"
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*   SOCKELL - High-Performance Networking Library                             */
+/*                                                                             */
+/*   A lightweight, C++98-compliant networking library designed for            */
+/*   building high-performance servers with fluent API.                        */
+/*                                                                             */
+/*   Architecture:                                                             */
+/*     Server → Network[] → Protocol[] → Client[]                              */
+/*                       ↘ Router (fluent routing with variables)              */
+/*                       ↘ Channel[] (groups with custom permissions)          */
+/*                                                                             */
+/*   Features:                                                                 */
+/*     • TCP + UDP support (send/recv, sendto/recvfrom)                        */
+/*     • IPv4 + IPv6 + Dual-stack support                                      */
+/*     • epoll per network (scalable I/O)                                      */
+/*     • Fluent API with << operators                                          */
+/*     • Template-based user data (no void* casts)                             */
+/*     • Zero-copy message parsing                                             */
+/*     • Unlimited callbacks, routes, clients, channels                        */
+/*     • Built-in rate limiting (DDoS protection)                              */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
-#define SKLL_ON_START       (1 << 0)
-#define SKLL_ON_UPDATE      (1 << 1)
-#define SKLL_ON_STOP        (1 << 2)
-#define SKLL_ON_SHUTDOWN    (1 << 3)
-#define SKLL_ON_CONNECT     (1 << 4)
-#define SKLL_ON_DISCONNECT  (1 << 5)
-#define SKLL_ON_ERROR       (1 << 6)
-#define SKLL_ON_TIMEOUT     (1 << 7)
-#define SKLL_ON_RECV        (1 << 8)
-#define SKLL_ON_SEND        (1 << 9)
-#define SKLL_ON_SIGNAL      (1 << 10)
+/* Core */
+#include <Sockell/SkllTypes.hpp>
+#include <Sockell/SkllException.hpp>
+#include <Sockell/SkllLog.hpp>
+#include <Sockell/SkllBuffer.hpp>
+#include <Sockell/SkllMessage.hpp>
+#include <Sockell/SkllSender.hpp>
 
-#define SKLL_TCP    (1 << 0)
-#define SKLL_UDP    (1 << 1)
-#define SKLL_IPV4   (1 << 2)
-#define SKLL_IPV6   (1 << 3)
+/* Routing &Hooks */
+#include <Sockell/SkllHook.hpp>
+#include <Sockell/SkllRouter.hpp>
 
-#define SKLL_TIME_HHMMSS "%H:%M:%S"
+/* Connection Management */
+#include <Sockell/SkllClient.hpp>
+#include <Sockell/SkllChannel.hpp>
+#include <Sockell/SkllProtocol.hpp>
+#include <Sockell/SkllNetwork.hpp>
 
-struct Sockell { static std::string timestamp();};
+/* Server &Signals */
+#include <Sockell/SkllSignals.hpp>
+#include <Sockell/SkllEvent.hpp>
+#include <Sockell/SkllServer.hpp>

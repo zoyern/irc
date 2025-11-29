@@ -1,27 +1,18 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   SkllServerPrivate.cpp                              :+:      :+:    :+:   */
+/*   SkllClient.tpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: marvin <marvin@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/23 02:17:12 by marvin            #+#    #+#             */
-/*   Updated: 2025/11/23 02:17:12 by marvin           ###   ########.fr       */
+/*   Created: 2025/11/29 01:06:35 by marvin            #+#    #+#             */
+/*   Updated: 2025/11/29 01:06:35 by marvin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockell/SkllServer.hpp>
+#pragma once
+#include <Sockell/SkllClient.hpp>
 
-SkllServer::SkllServer(const SkllServer&) {}
-SkllServer	&SkllServer::operator=(const SkllServer&) { return (*this); }
-
-void SkllServer::trigger_event(int type)
-{
-	SkllEvent event;
-	event.type = type;
-	event.server = this;
-	for (NetworksMapIt it = _nets.begin(); it != _nets.end(); ++it) {
-		event.network = it->second; 
-		_hook.trigger(type, &event);
-	}
-}
+template <typename T> T			*SkllClient::data() { return (static_cast<T *>(_data)); }
+template <typename T> void		SkllClient::set_data(T *ptr) { _data = ptr; }
+template <typename T> const T	*SkllClient::data() const { return (static_cast<const T *>(_data)); }

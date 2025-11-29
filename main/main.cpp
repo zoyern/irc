@@ -10,62 +10,55 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <Sockall.hpp>
-#include <IRC.hpp>
-#include <IRC/IRCServer.hpp>
+
+#include <IRCServer.hpp>
 #include <iostream>
 #include <cstdlib>
 
-#define	IRC_MAX_CLIENT		10000
-#define	IRC_TIMEOUT 		0
-#define	IRC_QUEUE_EVENT		128
+static void usage(const char *prog) {
+	std::cout << "Usage: " << prog << " <port> <password>" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Arguments:" << std::endl;
+	std::cout << "  port      Port number (1024-65535)" << std::endl;
+	std::cout << "  password  Server password (required for all clients)" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Examples:" << std::endl;
+	std::cout << "  " << prog << " 6667 secret123" << std::endl;
+	std::cout << "  " << prog << " 6697 mypassword" << std::endl;
+	std::cout << std::endl;
+	std::cout << "Testing:" << std::endl;
+	std::cout << "  nc -C localhost 6667          # Manual test with netcat" << std::endl;
+	std::cout << "  python3 test_all.py 6667 secret123  # Automated tests" << std::endl;
+}
 
-int main(int argc, char **argv) {
-	if (argc != 3) return (std::cerr << "Usage: " << argv[0] << " <port> <password>" << std::endl, 1);
-	
-	int port = std::atoi(argv[1]); std::string password = argv[2];
-	if (port < 1024 || port > 65535) return (std::cerr << "Error: Port must be between 1024-65535" << std::endl, 1);
+int main(int argc, char ** argv) {
+	if (argc != 3) {
+		usage(argv[0]);
+		return 1;
+	}
+
+	/* Validate port */
+	int port = std::atoi(argv[1]);
+	if (port < 1024 || port > 65535) {
+		std::cerr << "Error: Port must be between 1024 and 65535" << std::endl;
+		return 1;
+	}
+
+	/* Validate password */
+	std::string password = argv[2];
+	if (password.empty()) {
+		std::cerr << "Error: Password cannot be empty" << std::endl;
+		return 1;
+	}
+
+	/* Start server */
 	try {
-		IRCServer		irc_server(password);
-		SkllServer		server(IRC_MAX_CLIENT);
-		SkllProtocol	irc_tcp("irc", "0.0.0.0", port, SKLL_TCP | SKLL_IPV4);
-		SkllNetwork		network("irc_network", IRC_TIMEOUT, IRC_QUEUE_EVENT);
+		IRCServer server(port, password);
+		server.start();
+	} catch (const std::exception &e) {
+		std::cerr << "Fatal error: " << e.what() << std::endl;
+		return 1;
+	}
 
-		server
-			.on(SKLL_ON_START, IRCServer::on_server_start, &irc_server)
-			.networks(network)
-				.on(SKLL_ON_SIGNAL, on_signal, NULL)
-				.listen(irc_tcp)
-					.set_reuseaddr(true)
-					.set_nodelay(true)
-					.set_keepalive(true)
-					.set_chunk_size(4096)
-					.on(SKLL_ON_CONNECT, IRCServer::on_client_connect, &irc_server)
-					.on(SKLL_ON_DISCONNECT, IRCServer::on_client_disconnect, &irc_server)
-					.router()
-						.delim(IRC_CRLF, "\r\n")
-						.delim(IRC_LF, "\n")
-					.router()
-						.ctrl(IRC_CRLF | IRC_LF)
-							.route("PASS ", irc_cmd_pass, &irc_server)
-							.route("NICK ", irc_cmd_nick, &irc_server)
-							.route("USER ", irc_cmd_user, &irc_server)
-							.route("JOIN ", irc_cmd_join, &irc_server)
-							.route("PART ", irc_cmd_part, &irc_server)
-							.route("TOPIC ", irc_cmd_topic, &irc_server)
-							.route("PRIVMSG ", irc_cmd_privmsg, &irc_server)
-							.route("MODE ", irc_cmd_mode, &irc_server)
-								.match("i", irc_cmd_mode_i, &irc_server)
-								.match("t", irc_cmd_mode_t, &irc_server)
-								.match("k", irc_cmd_mode_k, &irc_server)
-								.match("o", irc_cmd_mode_o, &irc_server)
-								.match("l", irc_cmd_mode_l, &irc_server)
-							.route("KICK ", irc_cmd_kick, &irc_server)
-							.route("INVITE ", irc_cmd_invite, &irc_server)
-							.route("PING ", irc_cmd_ping, &irc_server)
-							.route("QUIT", irc_cmd_quit, &irc_server);
-		return (std::cout << SKLL_GREEN << "\n[" << irc_timestamp() << "] " << SKLL_RESET << "Server ready on port " << SKLL_BOLD << port << SKLL_RESET << std::endl,
-			server.run());
-	} catch (const std::exception &e)
-		{ return (std::cerr << IRC_COLOR_ERROR << "[" << irc_timestamp() << "] Fatal: " << SKLL_RESET << e.what() << std::endl, 1); }
+	return 0;
 }

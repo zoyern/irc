@@ -26,14 +26,9 @@ MAIN_IFLAGS		= -I$(INC_DIR) -I$(MAIN_INC_DIR)
 MAIN_LFLAGS		= -L$(MAIN_LIB_DIR) -l$(LIB_NAME)
 MAIN_DEPFLAGS	= -MMD -MP
 
-MAIN_SRC		=	IRC.cpp
-MAIN_SRC		+=	IRCClient.cpp
-MAIN_SRC		+=	IRCChannel.cpp
-MAIN_SRC		+=	IRCServer.cpp
-MAIN_SRC		+=	IRCCommands.cpp
-MAIN_SRC		+=	IRCErrors.cpp
-
 MAIN_FILE		=	main.cpp
+
+MAIN_SRC		=	IRCServer.cpp
 
 MAIN_SRC_FILES	= $(addprefix $(MAIN_SRC_DIR)/, $(MAIN_SRC))
 MAIN_MAIN_FILE	= $(addprefix $(MAIN_DIR)/, $(MAIN_FILE))
